@@ -17,6 +17,7 @@ public:
     void open(const QUrl &endpoint);
     quint64 request(const QString &method, const QJsonObject &params, Callback callback = {});
     void close();
+    void flush() { m_socket.flush(); }
 signals:
     void connected();
     void disconnected(const QString &reason);

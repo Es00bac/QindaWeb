@@ -23,7 +23,7 @@ public:
     ~FirefoxEngine() override;
     bool start(const QString &program, const QString &profile, QString *error);
     void addView(BrowserView *view, const QUrl &url);
-    void adoptView(BrowserView *view, const QString &context, const QUrl &url);
+    void adoptReadyView(BrowserView *view, const QString &context, const QUrl &url, QWaylandXdgSurface *surface);
     void closeView(BrowserView *view);
     void navigate(BrowserView *view, const QUrl &url);
     void reload(BrowserView *view);
@@ -35,7 +35,7 @@ signals:
     void identityChanged();
     void failed(const QString &message);
     void ready();
-    void unsolicitedContext(const QString &context, const QUrl &url);
+    void unsolicitedWindow(const QString &context, const QUrl &url, QWaylandXdgSurface *surface, const QString &title);
     void viewClosed(BrowserView *view);
 private:
     struct Creation {
@@ -47,6 +47,7 @@ private:
         bool submitted = false;
         bool marked = false;
         bool navigate = true;
+        bool unsolicited = false;
     };
     void processOutput();
     void establishSession();

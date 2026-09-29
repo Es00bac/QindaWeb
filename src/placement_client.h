@@ -13,6 +13,7 @@ public:
     quint32 place(QWindow *source, QWindow *created, const QString &placement, QString *error);
     void cancel(quint32 id);
 signals:
+    void availableChanged();
     void finished(quint32 id, bool accepted, const QString &containerId, const QString &message);
 private:
     class Impl;

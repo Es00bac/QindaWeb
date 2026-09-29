@@ -14,7 +14,7 @@ class BrowserView;
 class BrowserController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString engineIdentity READ engineIdentity NOTIFY engineIdentityChanged)
-    Q_PROPERTY(bool placementAvailable READ placementAvailable CONSTANT)
+    Q_PROPERTY(bool placementAvailable READ placementAvailable NOTIFY placementAvailableChanged)
     Q_PROPERTY(bool desktopThemeReady READ desktopThemeReady NOTIFY desktopThemeChanged)
     Q_PROPERTY(QString desktopThemeError READ desktopThemeError NOTIFY desktopThemeChanged)
 public:
@@ -23,7 +23,7 @@ public:
     bool start(const QString &program, const QString &profile, QString *error);
     BrowserView *newView(BrowserView *source = nullptr, const QString &placement = {},
                          const QUrl &url = QUrl(QStringLiteral("about:blank")), bool show = true,
-                         const QString &adoptContext = {});
+                         const QString &adoptContext = {}, QWaylandXdgSurface *adoptSurface = nullptr);
     void beginSplit(BrowserView *source);
     void confirmSplit(BrowserView *source, const QString &direction);
     void cancelSplit(BrowserView *source);
@@ -39,6 +39,7 @@ public:
     FirefoxEngine *engine() { return &m_engine; }
     QList<BrowserView *> views() const;
 signals:
+    void placementAvailableChanged();
     void engineIdentityChanged();
     void desktopThemeChanged();
     void viewCreated(BrowserView *view);

@@ -47,12 +47,12 @@ FirefoxEngine::FirefoxEngine(GeckoSurfaceHost *host, QObject *parent)
 }
 FirefoxEngine::~FirefoxEngine()
 {
-    m_stopping = true;
-    m_bidi.close();
-    if (m_process.state() != QProcess::NotRunning) {
+    stop();
+    if (m_process.state() != QProcess::NotRunning && !m_process.waitForFinished(2000)) {
         m_process.terminate();
         if (!m_process.waitForFinished(3000)) { m_process.kill(); m_process.waitForFinished(1000); }
     }
+    m_bidi.close();
 }
 bool FirefoxEngine::start(const QString &program, const QString &profile, QString *error)
 {
@@ -178,7 +178,15 @@ void FirefoxEngine::engineEvent(const QString &method, const QJsonObject &params
             m_candidates.insert(context, QUrl(params.value(QStringLiteral("url")).toString()));
             offerCandidates();
         }
-        if (method == QStringLiteral("browsingContext.contextDestroyed")) m_candidates.remove(context);
+        if (method == QStringLiteral("browsingContext.contextDestroyed")) {
+            m_candidates.remove(context);
+            for (qsizetype i = m_creation.size() - 1; i >= 0; --i) {
+                if (m_creation.at(i).context != context) continue;
+                const auto closed = m_creation.takeAt(i);
+                if (closed.view) { closed.view->setLoading(false); closed.view->setMessage(QStringLiteral("Gecko closed the page before it was ready.")); }
+                if (i == 0) { m_pairTimer.stop(); nextCreation(); }
+            }
+        }
         return;
     }
     if (method == QStringLiteral("browsingContext.contextDestroyed")) {
@@ -205,7 +213,14 @@ void FirefoxEngine::fail(const QString &message)
 }
 void FirefoxEngine::stop()
 {
+    if (m_stopping) return;
     m_stopping = true;
+    m_ready = false;
+    m_startupTimer.stop();
+    m_pairTimer.stop();
+    m_creation.clear();
+    m_candidates.clear();
     m_bidi.request(QStringLiteral("browser.close"), {});
+    m_bidi.flush();
 }
 }

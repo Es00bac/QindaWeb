@@ -18,11 +18,14 @@ void FirefoxEngine::addView(BrowserView *view, const QUrl &url)
     m_creation.enqueue({view, url, {}, {}, {}, false, false, true});
     nextCreation();
 }
-void FirefoxEngine::adoptView(BrowserView *view, const QString &context, const QUrl &url)
+void FirefoxEngine::adoptReadyView(BrowserView *view, const QString &context, const QUrl &url, QWaylandXdgSurface *surface)
 {
-    m_candidates.remove(context);
-    m_creation.enqueue({view, url, context, {}, {}, false, false, false});
-    nextCreation();
+    m_views.insert(context, view);
+    view->setContextId(context);
+    view->setSurface(surface);
+    view->setUrl(url);
+    view->setLoading(false);
+    view->setMessage({});
 }
 void FirefoxEngine::offerCandidates()
 {
@@ -34,13 +37,14 @@ void FirefoxEngine::offerCandidates()
         bool requested = false;
         for (const auto &creation : m_creation) if (creation.context == it.key()) requested = true;
         if (!requested && !m_views.contains(it.key()) && !m_bootstrapContexts.contains(it.key()))
-            emit unsolicitedContext(it.key(), it.value());
+            m_creation.enqueue({nullptr, it.value(), it.key(), {}, {}, false, false, false, true});
     }
+    nextCreation();
 }
 void FirefoxEngine::nextCreation()
 {
     if (!m_ready || m_creation.isEmpty() || m_creation.head().submitted) return;
-    if (!m_creation.head().view) { m_creation.dequeue(); nextCreation(); return; }
+    if (!m_creation.head().view && !m_creation.head().unsolicited) { m_creation.dequeue(); nextCreation(); return; }
     auto &creation = m_creation.head();
     creation.submitted = true;
     if (!creation.context.isEmpty()) { markCreation(); return; }
@@ -105,19 +109,24 @@ void FirefoxEngine::pairCreation()
     if (!surface) return;
     m_pairTimer.stop();
     const auto creation = m_creation.dequeue();
-    if (creation.view) {
-        creation.view->setContextId(creation.context);
-        creation.view->setSurface(surface);
-        creation.view->setTitle(creation.originalTitle);
-        creation.view->setUrl(creation.url);
-        creation.view->setMessage({});
-        m_views.insert(creation.context, creation.view);
+    if (creation.view || creation.unsolicited) {
+        // Transient bootstrap tabs do not get outer windows. Unsolicited pages
+        // first prove their own context/surface pair on the private display.
+        if (creation.unsolicited) emit unsolicitedWindow(creation.context, creation.url, surface, creation.originalTitle);
+        else {
+            m_views.insert(creation.context, creation.view);
+            creation.view->setContextId(creation.context);
+            creation.view->setSurface(surface);
+            creation.view->setTitle(creation.originalTitle);
+            creation.view->setUrl(creation.url);
+            creation.view->setMessage({});
+        }
         const auto bootstrap = std::exchange(m_bootstrapContexts, {});
         for (const auto &context : bootstrap)
             m_bidi.request(QStringLiteral("browsingContext.close"), {{QStringLiteral("context"), context}});
         if (creation.navigate) navigate(creation.view, creation.url);
         else {
-            creation.view->setLoading(false);
+            if (creation.view) creation.view->setLoading(false);
             const QString restore = QStringLiteral("if (document.title === %1) document.title = %2;")
                                         .arg(jsString(creation.marker), jsString(creation.originalTitle));
             m_bidi.request(QStringLiteral("script.evaluate"),

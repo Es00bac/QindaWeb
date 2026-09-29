@@ -6,16 +6,21 @@
 #include <QQuickWindow>
 #include <QGuiApplication>
 #include <QTimer>
+#include <QCoreApplication>
+#include <QEvent>
 namespace QindaWeb {
 BrowserController::BrowserController(QQmlApplicationEngine *qml, QObject *parent)
     : QObject(parent), m_qml(qml), m_appearance(qml), m_engine(&m_host)
 {
     connect(&m_appearance, &DesktopAppearance::changed, this, &BrowserController::desktopThemeChanged);
     connect(&m_engine, &FirefoxEngine::identityChanged, this, &BrowserController::engineIdentityChanged);
-    connect(&m_engine, &FirefoxEngine::unsolicitedContext, this, [this](const QString &context, const QUrl &url) {
-        newView(nullptr, {}, url, true, context);
+    connect(&m_engine, &FirefoxEngine::unsolicitedWindow, this,
+        [this](const QString &context, const QUrl &url, QWaylandXdgSurface *surface, const QString &title) {
+        if (m_closing) return;
+        if (auto *view = newView(nullptr, {}, url, true, context, surface)) view->setTitle(title);
     });
     connect(&m_engine, &FirefoxEngine::viewClosed, this, &BrowserController::closeView);
+    connect(&m_placement, &PlacementClient::availableChanged, this, &BrowserController::placementAvailableChanged);
     connect(&m_placement, &PlacementClient::finished, this,
         [this](quint32 id, bool accepted, const QString &, const QString &message) {
             const auto view = m_placements.take(id);
@@ -25,12 +30,16 @@ BrowserController::BrowserController(QQmlApplicationEngine *qml, QObject *parent
 BrowserController::~BrowserController()
 {
     m_closing = true;
+    m_engine.stop();
     const auto live = views();
     for (auto *view : live) {
         view->stopMenuExport();
         if (view->window()) delete view->window();
         delete view;
     }
+    // Release GUI-thread scene-graph buffer wrappers while the private
+    // Wayland display and its resources still exist.
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
 }
 bool BrowserController::start(const QString &program, const QString &profile, QString *error)
 {
@@ -44,7 +53,7 @@ QList<BrowserView *> BrowserController::views() const
     for (auto view : m_views) if (view) result.append(view);
     return result;
 }
-BrowserView *BrowserController::newView(BrowserView *source, const QString &placement, const QUrl &url, bool show, const QString &adoptContext)
+BrowserView *BrowserController::newView(BrowserView *source, const QString &placement, const QUrl &url, bool show, const QString &adoptContext, QWaylandXdgSurface *adoptSurface)
 {
     auto *view = new BrowserView(this);
     if (source) view->setChromeVisible(source->chromeVisible());
@@ -71,7 +80,7 @@ BrowserView *BrowserController::newView(BrowserView *source, const QString &plac
     if (show) window->show();
     if (!show) m_pendingPages.insert(view->id(), url);
     else if (adoptContext.isEmpty()) m_engine.addView(view, url);
-    else m_engine.adoptView(view, adoptContext, url);
+    else m_engine.adoptReadyView(view, adoptContext, url, adoptSurface);
     if (source && !placement.isEmpty()) submitPlacement(source, view, placement);
     emit viewCreated(view);
     return view;

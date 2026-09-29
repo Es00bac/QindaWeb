@@ -15,6 +15,7 @@ PlacementClient::PlacementClient(QObject *parent) : QObject(parent), m_impl(std:
 {
 #ifdef QINDAWEB_HAVE_PLACEMENT
     using namespace QindaQt::ApplicationWindowManagement;
+    connect(&m_impl->client, &WindowPlacementClient::availableChanged, this, &PlacementClient::availableChanged);
     connect(&m_impl->client, &WindowPlacementClient::finished, this,
         [this](quint32 id, Status status, const QString &container, const QString &message) {
             emit finished(id, status == Status::Accepted, container, message);
