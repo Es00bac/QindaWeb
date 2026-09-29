@@ -3,12 +3,12 @@
 #include "browser_view.h"
 #include "navigation.h"
 #include "profile.h"
+#include "application_instance.h"
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 #include <QCommandLineParser>
 #include <QStandardPaths>
-#include <QLockFile>
 #include <QDir>
 #include <cstdio>
 int main(int argc, char **argv)
@@ -26,31 +26,41 @@ int main(int argc, char **argv)
     parser.addHelpOption(); parser.addVersionOption();
     parser.addOption({QStringLiteral("firefox"), QStringLiteral("Firefox runtime executable (development override)"), QStringLiteral("path")});
     parser.addOption({QStringLiteral("profile"), QStringLiteral("QindaWeb-owned runtime profile directory"), QStringLiteral("directory")});
+    parser.addOption({QStringLiteral("hide-controls"), QStringLiteral("Start new pages with browser controls hidden")});
     parser.addPositionalArgument(QStringLiteral("urls"), QStringLiteral("Addresses or search terms"), QStringLiteral("[urls…]"));
     parser.process(app);
     const QString profile = parser.isSet(QStringLiteral("profile")) ? parser.value(QStringLiteral("profile")) :
         QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/firefox");
-    QDir().mkpath(profile);
-    QLockFile lock(profile + QStringLiteral("/qindaweb.lock"));
-    if (!lock.tryLock(0)) {
-        std::fprintf(stderr, "qindaweb: this QindaWeb profile is already in use\n");
+    if (!QDir().mkpath(profile)) { std::fprintf(stderr, "qindaweb: cannot create the profile directory\n"); return 1; }
+    const QStringList inputs = parser.positionalArguments().isEmpty() ? QStringList{QStringLiteral("about:blank")} : parser.positionalArguments();
+    const bool hideControls = parser.isSet(QStringLiteral("hide-controls"));
+    QString error;
+    ApplicationInstance instance(profile);
+    const auto instanceResult = instance.start(inputs, hideControls, &error);
+    if (instanceResult == ApplicationInstance::Result::Forwarded) return 0;
+    if (instanceResult == ApplicationInstance::Result::Failed) {
+        std::fprintf(stderr, "qindaweb: %s\n", qPrintable(error));
         return 2;
     }
     qmlRegisterUncreatableType<BrowserView>("QindaWeb", 1, 0, "BrowserView", QStringLiteral("Owned by the browser"));
     qmlRegisterUncreatableType<BrowserController>("QindaWeb", 1, 0, "BrowserController", QStringLiteral("Owned by the application"));
     QQmlApplicationEngine qml;
     BrowserController browser(&qml);
-    QString error;
+    auto openUrls = [&](const QStringList &urls, bool hidden) {
+        for (const auto &input : urls) {
+            QString failure;
+            const QUrl url = navigationUrl(input, &failure);
+            if (url.isEmpty()) { std::fprintf(stderr, "qindaweb: %s\n", qPrintable(failure)); continue; }
+            if (auto *view = browser.newView(nullptr, {}, url)) view->setChromeVisible(!hidden);
+        }
+    };
+    QObject::connect(&instance, &ApplicationInstance::openRequested, &browser, openUrls);
     if (!browser.start(firefoxExecutable(parser.value(QStringLiteral("firefox"))), profile, &error)) {
         std::fprintf(stderr, "qindaweb: %s\n", qPrintable(error));
         return 1;
     }
-    const QStringList inputs = parser.positionalArguments().isEmpty() ? QStringList{QStringLiteral("about:blank")} : parser.positionalArguments();
-    for (const auto &input : inputs) {
-        const QUrl url = navigationUrl(input, &error);
-        if (url.isEmpty()) { std::fprintf(stderr, "qindaweb: %s\n", qPrintable(error)); continue; }
-        if (!browser.newView(nullptr, {}, url)) return 1;
-    }
+    openUrls(inputs, hideControls);
+    instance.setReady();
     if (browser.views().isEmpty()) return 2;
     return app.exec();
 }

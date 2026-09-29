@@ -2,9 +2,11 @@
 #include "browser_view.h"
 #include "browser_controller.h"
 #include "navigation.h"
+#include "global_menu_export.h"
 #include <QQuickWindow>
 #include <QWaylandSurface>
 #include <QUuid>
+#include <QEvent>
 #include <cmath>
 namespace QindaWeb {
 BrowserView::BrowserView(BrowserController *controller)
@@ -15,15 +17,38 @@ BrowserView::BrowserView(BrowserController *controller)
     m_shortcuts.setRegistry(&m_commands);
     installCommands();
 }
+BrowserView::~BrowserView() = default;
+bool BrowserView::globalMenuAvailable() const { return m_globalMenu && m_globalMenu->available(); }
+QString BrowserView::globalMenuObjectPath() const { return m_globalMenu ? m_globalMenu->objectPath() : QString(); }
+void BrowserView::setChromeVisible(bool visible)
+{
+    if (m_chromeVisible == visible) return;
+    m_chromeVisible = visible;
+    m_commands.invalidate();
+    emit changed();
+}
+void BrowserView::stopMenuExport() { m_globalMenu.reset(); }
 void BrowserView::setWindow(QQuickWindow *window, QWaylandQuickOutput *output)
 {
     m_window = window;
     m_output = output;
     m_shortcuts.setWindow(window);
+    m_globalMenu = std::make_unique<GlobalMenuExport>(this, window);
+    connect(m_globalMenu.get(), &GlobalMenuExport::availableChanged, this, &BrowserView::changed);
+    m_globalMenu->start();
+    window->installEventFilter(this);
     connect(window, &QWindow::activeChanged, this, [this] {
         if (m_window && m_window->isActive()) m_controller->activate(this);
     });
     emit changed();
+}
+bool BrowserView::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_window && event->type() == QEvent::DevicePixelRatioChange) {
+        if (m_output) m_output->setScaleFactor(qMax(1, static_cast<int>(std::ceil(m_window->devicePixelRatio()))));
+        resizeContent(m_contentSize.width(), m_contentSize.height());
+    }
+    return QObject::eventFilter(watched, event);
 }
 void BrowserView::setSurface(QWaylandXdgSurface *surface)
 {
@@ -66,10 +91,16 @@ bool BrowserView::navigate(const QString &input)
 void BrowserView::resizeContent(qreal width, qreal height)
 {
     if (!std::isfinite(width) || !std::isfinite(height) || width < 1 || height < 1) return;
-    const QSize size(qRound(width), qRound(height));
-    m_contentSize = size;
+    m_contentSize = QSize(qRound(width), qRound(height));
+    const qreal ratio = m_window ? m_window->devicePixelRatio() : 1;
+    const qreal outputScale = m_output ? m_output->scaleFactor() : 1;
+    const QSize size(qRound(width * ratio / outputScale), qRound(height * ratio / outputScale));
     if (!m_surface || !m_surface->toplevel()) return;
-    const QList<QWaylandXdgToplevel::State> states{QWaylandXdgToplevel::ActivatedState};
+    // The internal Gecko window is content-only. Fullscreen on this PRIVATE
+    // display removes GTK's CSD/shadows; the outer Qt window stays ordinary and
+    // remains under QindaQt's control. Configure in internal display units.
+    const QList<QWaylandXdgToplevel::State> states{QWaylandXdgToplevel::ActivatedState,
+                                                QWaylandXdgToplevel::FullscreenState};
     m_surface->toplevel()->sendConfigure(size, states);
 }
 void BrowserView::confirmSplit(const QString &direction) { m_controller->confirmSplit(this, direction); }

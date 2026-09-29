@@ -27,13 +27,22 @@ FirefoxEngine::FirefoxEngine(GeckoSurfaceHost *host, QObject *parent)
         if (!m_stopping) fail(reason);
     });
     connect(host, &GeckoSurfaceHost::toplevelCreated, this, [this](QWaylandXdgSurface *surface) {
+        // Firefox/QindaFox can expose startup implementation contexts. Create
+        // managed pages explicitly; never pair them to those bootstrap windows.
+        if (!m_ready) return;
         m_surfaces.enqueue(surface);
+        connect(surface->toplevel(), &QWaylandXdgToplevel::titleChanged, this, &FirefoxEngine::pairCreation);
         pairCreation();
     });
     m_startupTimer.setSingleShot(true);
     m_startupTimer.setInterval(30000);
     connect(&m_startupTimer, &QTimer::timeout, this, [this] {
         fail(QStringLiteral("Gecko did not finish starting within 30 seconds."));
+    });
+    m_pairTimer.setSingleShot(true);
+    m_pairTimer.setInterval(15000);
+    connect(&m_pairTimer, &QTimer::timeout, this, [this] {
+        rejectCreation(QStringLiteral("Gecko did not identify the page surface within 15 seconds."));
     });
 }
 FirefoxEngine::~FirefoxEngine()
@@ -110,11 +119,8 @@ void FirefoxEngine::establishSession()
                         [this](const QJsonObject &tree, const QString &treeError) {
                             if (!treeError.isEmpty()) { fail(treeError); return; }
                             const auto contexts = tree.value(QStringLiteral("contexts")).toArray();
-                            if (contexts.size() != 1) {
-                                fail(QStringLiteral("Gecko must start with one empty browsing window."));
-                                return;
-                            }
-                            m_initialContext = contexts.first().toObject().value(QStringLiteral("context")).toString();
+                            for (const auto &context : contexts)
+                                m_bootstrapContexts.append(context.toObject().value(QStringLiteral("context")).toString());
                             m_ready = true;
                             m_startupTimer.stop();
                             emit ready();
@@ -122,54 +128,6 @@ void FirefoxEngine::establishSession()
                         });
                 });
         });
-}
-void FirefoxEngine::addView(BrowserView *view, const QUrl &url)
-{
-    m_creation.enqueue({view, url, {}, false});
-    nextCreation();
-}
-void FirefoxEngine::nextCreation()
-{
-    if (!m_ready || m_creation.isEmpty() || m_creation.head().submitted) return;
-    if (!m_creation.head().view) { m_creation.dequeue(); nextCreation(); return; }
-    auto &creation = m_creation.head();
-    creation.submitted = true;
-    if (!m_initialContext.isEmpty()) {
-        creation.context = std::exchange(m_initialContext, {});
-        pairCreation();
-        return;
-    }
-    m_bidi.request(QStringLiteral("browsingContext.create"),
-        {{QStringLiteral("type"), QStringLiteral("window")}},
-        [this](const QJsonObject &result, const QString &error) {
-            if (m_creation.isEmpty()) return;
-            if (!error.isEmpty()) {
-                if (m_creation.head().view) m_creation.head().view->setMessage(error);
-                m_creation.dequeue();
-                nextCreation();
-                return;
-            }
-            m_creation.head().context = result.value(QStringLiteral("context")).toString();
-            pairCreation();
-        });
-}
-void FirefoxEngine::pairCreation()
-{
-    while (!m_surfaces.isEmpty() && !m_surfaces.head()) m_surfaces.dequeue();
-    if (m_creation.isEmpty() || m_creation.head().context.isEmpty() || m_surfaces.isEmpty()) return;
-    const auto creation = m_creation.dequeue();
-    auto *surface = m_surfaces.dequeue().data();
-    if (creation.view) {
-        creation.view->setContextId(creation.context);
-        creation.view->setSurface(surface);
-        creation.view->setMessage({});
-        m_views.insert(creation.context, creation.view);
-        navigate(creation.view, creation.url);
-    } else {
-        surface->toplevel()->sendClose();
-        m_bidi.request(QStringLiteral("browsingContext.close"), {{QStringLiteral("context"), creation.context}});
-    }
-    nextCreation();
 }
 void FirefoxEngine::navigate(BrowserView *view, const QUrl &url)
 {
@@ -202,6 +160,7 @@ void FirefoxEngine::traverse(BrowserView *view, int delta)
 }
 void FirefoxEngine::closeView(BrowserView *view)
 {
+    for (auto &creation : m_creation) if (creation.view == view) creation.view = nullptr;
     if (!view->contextId().isEmpty()) {
         m_views.remove(view->contextId());
         m_bidi.request(QStringLiteral("browsingContext.close"), {{QStringLiteral("context"), view->contextId()}});
@@ -215,13 +174,17 @@ void FirefoxEngine::engineEvent(const QString &method, const QJsonObject &params
         // App-requested creation is paired by its response. Unrequested top
         // levels are recorded separately; subframes never become app windows.
         if (method == QStringLiteral("browsingContext.contextCreated") && m_ready &&
-            params.value(QStringLiteral("parent")).isNull() && m_creation.isEmpty())
-            emit unsolicitedContext(context, QUrl(params.value(QStringLiteral("url")).toString()));
+            params.value(QStringLiteral("parent")).isNull() && !m_bootstrapContexts.contains(context)) {
+            m_candidates.insert(context, QUrl(params.value(QStringLiteral("url")).toString()));
+            offerCandidates();
+        }
+        if (method == QStringLiteral("browsingContext.contextDestroyed")) m_candidates.remove(context);
         return;
     }
     if (method == QStringLiteral("browsingContext.contextDestroyed")) {
         view->setContextId({});
-        view->setMessage(QStringLiteral("This Gecko page was closed."));
+        m_views.remove(context);
+        emit viewClosed(view);
         return;
     }
     if (params.contains(QStringLiteral("url"))) view->setUrl(QUrl(params.value(QStringLiteral("url")).toString()));
@@ -234,6 +197,7 @@ void FirefoxEngine::engineEvent(const QString &method, const QJsonObject &params
 void FirefoxEngine::fail(const QString &message)
 {
     m_startupTimer.stop();
+    m_pairTimer.stop();
     m_ready = false;
     for (auto view : m_views) if (view) { view->setLoading(false); view->setMessage(message); }
     for (auto creation : m_creation) if (creation.view) { creation.view->setLoading(false); creation.view->setMessage(message); }

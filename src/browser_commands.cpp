@@ -18,7 +18,9 @@ void BrowserView::installCommands()
         {QStringLiteral("browser.back"), tr("Back"), QStringLiteral("arrow-left"), tr("Navigate"), {}, QStringLiteral("Alt+Left")},
         {QStringLiteral("browser.forward"), tr("Forward"), QStringLiteral("arrow-right"), tr("Navigate"), {}, QStringLiteral("Alt+Right")},
         {QStringLiteral("browser.reload"), tr("Reload"), QStringLiteral("rotate-cw"), tr("Navigate"), {}, QStringLiteral("Ctrl+R")}};
-    for (const auto &descriptor : descriptors) {
+    auto commands = descriptors;
+    commands.append({QStringLiteral("browser.chrome"), tr("Show browser controls"), QStringLiteral("panel-top"), tr("View"), {}, QStringLiteral("Ctrl+Shift+H"), true});
+    for (const auto &descriptor : commands) {
         m_commands.registerCommand(descriptor);
         const QString id = descriptor.id;
         m_commands.registerHandler(scope, id, this,
@@ -31,9 +33,11 @@ void BrowserView::installCommands()
                 else if (id == QStringLiteral("browser.back")) m_controller->traverse(this, -1);
                 else if (id == QStringLiteral("browser.forward")) m_controller->traverse(this, 1);
                 else if (id == QStringLiteral("browser.reload")) m_controller->reload(this);
+                else if (id == QStringLiteral("browser.chrome")) setChromeVisible(!chromeVisible());
                 return {};
             }, [this, id](const CommandInvocationContext &) {
                 CommandState state;
+                if (id == QStringLiteral("browser.chrome")) state.checked = chromeVisible();
                 if (id == QStringLiteral("browser.back") || id == QStringLiteral("browser.forward") || id == QStringLiteral("browser.reload")) {
                     state.enabled = ready();
                     if (!state.enabled) state.disabledReason = tr("Gecko is starting");

@@ -19,7 +19,9 @@ sees only Qt toplevels. This does not embed libxul or port Mozilla's widgets.
 
 An internal WebDriver BiDi connection controls navigation and context creation.
 It uses the ephemeral loopback endpoint printed by our own Firefox child, with
-no system/chrome-script access. Session capabilities verify the engine identity;
+no system/chrome-script access. A short-lived page-title nonce pairs each exact
+owned context to its private Wayland surface, including racing web popups; arrival
+order is never identity. Session capabilities verify the engine identity;
 certificate verification remains enabled. No sandbox, site-isolation or
 accessibility disable flag is introduced. Automation's recommended testing
 preferences are disabled. This is an experimental browser host, not a claim of
@@ -35,14 +37,35 @@ use weak view references. BiDi requests finish once on response, deadline or
 disconnect. Runtime shutdown only targets the QProcess started here.
 
 Context/window creation is serialized, pairing each BiDi window response to an
-internal Gecko toplevel. Unsolicited popups and modal dialogs require explicit
-routing and qualification. App IDs/PIDs never prove foreign-surface ownership.
+internal Gecko toplevel. Web-created top-level contexts become native Qt windows;
+subframes never do. Engine context closure closes the matching native window.
+Internal fullscreen removes GTK decorations on the private display, while the
+outer Qt windows stay ordinary. Modal engine prompts still require qualification.
+App IDs/PIDs never prove foreign-surface ownership.
 
 Shortcuts, toolbar and menus share CommandRegistry. Ctrl+T creates a page and
 submits Tab relative to its source. Ctrl+Alt+T creates a page then asks for a side
 (arrow keys or native buttons); Escape keeps it separate. Ctrl+N opens an
 independent window. Ctrl+Shift+T is reserved for eventual reopen. An absent or
 refusing WM keeps the new window and reports the result.
+
+The split candidate is initially unmapped and its Gecko context starts only after
+placement confirmation or cancellation. This leaves keyboard focus with the source
+picker. Confirmation maps the Qt window and submits its owned surface to the SDK;
+cancellation maps it as an ordinary separate window. Closing a source releases its
+candidate as an ordinary window rather than leaving an invisible view behind.
+
+Ctrl+Shift+H hides the local menu, navigation and status bands without changing
+command state. Ctrl+L reveals a temporary address field. Exported File/Navigate/View
+commands and their checked/enabled state remain available while controls are hidden.
+Automatic local-menu suppression requires a complete validated menu publication and
+successful native announcement on the requesting Qt connection. Explicit user hiding
+is independent of that detection. Each native window owns and withdraws its endpoint.
+
+Theme publication consumes live, scoped Settings1 snapshots through the public
+desktop client. Exact selected theme IDs resolve through ordered user/system catalogs;
+invalid themes retain the last complete publication. Launch IPC is a separate bounded
+same-session D-Bus endpoint elected by the owned-profile lock, not an agent interface.
 
 The local side picker is a V1 compatibility UI. Replace it with the compositor's
 shared preview/confirm/cancel selector when that public contract lands. The

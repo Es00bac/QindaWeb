@@ -3,6 +3,7 @@
 #include "gecko_surface_host.h"
 #include "firefox_engine.h"
 #include "placement_client.h"
+#include "desktop_appearance.h"
 #include <QObject>
 #include <QPointer>
 #include <QHash>
@@ -14,12 +15,15 @@ class BrowserController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString engineIdentity READ engineIdentity NOTIFY engineIdentityChanged)
     Q_PROPERTY(bool placementAvailable READ placementAvailable CONSTANT)
+    Q_PROPERTY(bool desktopThemeReady READ desktopThemeReady NOTIFY desktopThemeChanged)
+    Q_PROPERTY(QString desktopThemeError READ desktopThemeError NOTIFY desktopThemeChanged)
 public:
     explicit BrowserController(QQmlApplicationEngine *qml, QObject *parent = nullptr);
     ~BrowserController() override;
     bool start(const QString &program, const QString &profile, QString *error);
     BrowserView *newView(BrowserView *source = nullptr, const QString &placement = {},
-                         const QUrl &url = QUrl(QStringLiteral("about:blank")));
+                         const QUrl &url = QUrl(QStringLiteral("about:blank")), bool show = true,
+                         const QString &adoptContext = {});
     void beginSplit(BrowserView *source);
     void confirmSplit(BrowserView *source, const QString &direction);
     void cancelSplit(BrowserView *source);
@@ -30,19 +34,24 @@ public:
     void activate(BrowserView *view);
     QString engineIdentity() const { return m_engine.identity(); }
     bool placementAvailable() const { return m_placement.available(); }
+    bool desktopThemeReady() const { return m_appearance.ready(); }
+    QString desktopThemeError() const { return m_appearance.error(); }
     FirefoxEngine *engine() { return &m_engine; }
     QList<BrowserView *> views() const;
 signals:
     void engineIdentityChanged();
+    void desktopThemeChanged();
     void viewCreated(BrowserView *view);
 private:
     void submitPlacement(BrowserView *source, BrowserView *created, const QString &placement);
     QQmlApplicationEngine *m_qml;
+    DesktopAppearance m_appearance;
     GeckoSurfaceHost m_host;
     FirefoxEngine m_engine;
     PlacementClient m_placement;
     QHash<QString, QPointer<BrowserView>> m_views;
     QHash<QString, QPointer<BrowserView>> m_splitCandidates;
+    QHash<QString, QUrl> m_pendingPages;
     QHash<quint32, QPointer<BrowserView>> m_placements;
     bool m_closing = false;
 };

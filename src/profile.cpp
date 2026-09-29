@@ -17,6 +17,23 @@ static bool writeOwnedFile(const QString &path, const QByteArray &bytes, QString
 }
 bool prepareProfile(const QString &directory, QString *error)
 {
+    const QString marker = directory + QStringLiteral("/qindaweb-profile");
+    const QDir profile(directory);
+    if (!QFileInfo::exists(marker)) {
+        const auto entries = profile.entryList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
+        for (const auto &entry : entries) {
+            if (entry == QStringLiteral("qindaweb.lock")) continue;
+            if (error) *error = QStringLiteral("Choose a new, empty QindaWeb profile directory; existing Firefox profiles are preserved.");
+            return false;
+        }
+    } else {
+        QFile ownership(marker);
+        if (QFileInfo(marker).isSymLink() || !ownership.open(QIODevice::ReadOnly) ||
+            ownership.readAll() != QByteArrayLiteral("QindaWeb owned profile v1\n")) {
+            if (error) *error = QStringLiteral("Invalid QindaWeb profile ownership marker.");
+            return false;
+        }
+    }
     if (!QDir().mkpath(directory + QStringLiteral("/chrome"))) {
         if (error) *error = QStringLiteral("Cannot create the QindaWeb Firefox profile.");
         return false;
@@ -37,12 +54,13 @@ user_pref("browser.sessionstore.resume_from_crash", false);
 user_pref("browser.shell.checkDefaultBrowser", false);
 user_pref("browser.aboutwelcome.enabled", false);
 user_pref("browser.startup.homepage_override.mstone", "ignore");
-user_pref("browser.tabs.drawInTitlebar", false);
-user_pref("browser.tabs.inTitlebar", 0);
+user_pref("browser.tabs.drawInTitlebar", true);
+user_pref("browser.tabs.inTitlebar", 1);
 user_pref("browser.link.open_newwindow", 2);
 user_pref("browser.link.open_newwindow.restriction", 0);
 )";
-    return writeOwnedFile(directory + QStringLiteral("/user.js"), prefs, error) &&
+    return writeOwnedFile(marker, QByteArrayLiteral("QindaWeb owned profile v1\n"), error) &&
+           writeOwnedFile(directory + QStringLiteral("/user.js"), prefs, error) &&
            writeOwnedFile(directory + QStringLiteral("/chrome/userChrome.css"), css.readAll(), error);
 }
 QString firefoxExecutable(const QString &overridePath)

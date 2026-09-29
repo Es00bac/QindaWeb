@@ -8,6 +8,7 @@ private slots:
     void acceptedAddresses() {
         QCOMPARE(QindaWeb::navigationUrl(QStringLiteral("example.org")), QUrl(QStringLiteral("https://example.org")));
         QCOMPARE(QindaWeb::navigationUrl(QStringLiteral("http://localhost:8080/a?q=x")), QUrl(QStringLiteral("http://localhost:8080/a?q=x")));
+        QCOMPARE(QindaWeb::navigationUrl(QStringLiteral("localhost:8080/a")), QUrl(QStringLiteral("https://localhost:8080/a")));
         QCOMPARE(QindaWeb::navigationUrl(QStringLiteral("about:blank")), QUrl(QStringLiteral("about:blank")));
     }
     void refuseExecutableChrome() {

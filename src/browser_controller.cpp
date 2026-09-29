@@ -8,9 +8,14 @@
 #include <QTimer>
 namespace QindaWeb {
 BrowserController::BrowserController(QQmlApplicationEngine *qml, QObject *parent)
-    : QObject(parent), m_qml(qml), m_engine(&m_host)
+    : QObject(parent), m_qml(qml), m_appearance(qml), m_engine(&m_host)
 {
+    connect(&m_appearance, &DesktopAppearance::changed, this, &BrowserController::desktopThemeChanged);
     connect(&m_engine, &FirefoxEngine::identityChanged, this, &BrowserController::engineIdentityChanged);
+    connect(&m_engine, &FirefoxEngine::unsolicitedContext, this, [this](const QString &context, const QUrl &url) {
+        newView(nullptr, {}, url, true, context);
+    });
+    connect(&m_engine, &FirefoxEngine::viewClosed, this, &BrowserController::closeView);
     connect(&m_placement, &PlacementClient::finished, this,
         [this](quint32 id, bool accepted, const QString &, const QString &message) {
             const auto view = m_placements.take(id);
@@ -22,12 +27,15 @@ BrowserController::~BrowserController()
     m_closing = true;
     const auto live = views();
     for (auto *view : live) {
+        view->stopMenuExport();
         if (view->window()) delete view->window();
         delete view;
     }
 }
 bool BrowserController::start(const QString &program, const QString &profile, QString *error)
 {
+    QString themeError;
+    if (!m_appearance.start(&themeError)) qWarning().noquote() << "QindaWeb desktop theme:" << themeError;
     return m_host.start(error) && m_engine.start(program, profile, error);
 }
 QList<BrowserView *> BrowserController::views() const
@@ -36,11 +44,13 @@ QList<BrowserView *> BrowserController::views() const
     for (auto view : m_views) if (view) result.append(view);
     return result;
 }
-BrowserView *BrowserController::newView(BrowserView *source, const QString &placement, const QUrl &url)
+BrowserView *BrowserController::newView(BrowserView *source, const QString &placement, const QUrl &url, bool show, const QString &adoptContext)
 {
     auto *view = new BrowserView(this);
+    if (source) view->setChromeVisible(source->chromeVisible());
     QQmlComponent component(m_qml, QUrl(QStringLiteral("qrc:/qml/BrowserWindow.qml")));
-    QObject *object = component.createWithInitialProperties({{QStringLiteral("view"), QVariant::fromValue(view)},
+    QObject *object = component.createWithInitialProperties({{QStringLiteral("visible"), false},
+                                                              {QStringLiteral("view"), QVariant::fromValue(view)},
                                                               {QStringLiteral("browser"), QVariant::fromValue(this)}});
     auto *window = qobject_cast<QQuickWindow *>(object);
     if (!window) {
@@ -58,8 +68,10 @@ BrowserView *BrowserController::newView(BrowserView *source, const QString &plac
             if (guard) closeView(guard);
         });
     });
-    window->show();
-    m_engine.addView(view, url);
+    if (show) window->show();
+    if (!show) m_pendingPages.insert(view->id(), url);
+    else if (adoptContext.isEmpty()) m_engine.addView(view, url);
+    else m_engine.adoptView(view, adoptContext, url);
     if (source && !placement.isEmpty()) submitPlacement(source, view, placement);
     emit viewCreated(view);
     return view;
@@ -75,7 +87,9 @@ void BrowserController::submitPlacement(BrowserView *source, BrowserView *create
 void BrowserController::beginSplit(BrowserView *source)
 {
     if (!source || m_splitCandidates.contains(source->id())) return;
-    auto *created = newView();
+    // Keep the candidate unmapped while choosing. A mapped ordinary window
+    // could take focus from the source and its keyboard placement dialog.
+    auto *created = newView(source, {}, QUrl(QStringLiteral("about:blank")), false);
     if (!created) return;
     m_splitCandidates.insert(source->id(), created);
     source->window()->requestActivate();
@@ -86,13 +100,21 @@ void BrowserController::confirmSplit(BrowserView *source, const QString &directi
     if (!source || !QStringList{QStringLiteral("left"), QStringLiteral("right"),
         QStringLiteral("up"), QStringLiteral("down")}.contains(direction)) return;
     const auto created = m_splitCandidates.take(source->id());
-    if (created) submitPlacement(source, created, direction);
+    if (created) {
+        created->window()->show();
+        submitPlacement(source, created, direction);
+        m_engine.addView(created, m_pendingPages.take(created->id()));
+    }
 }
 void BrowserController::cancelSplit(BrowserView *source)
 {
     if (!source) return;
     const auto created = m_splitCandidates.take(source->id());
-    if (created) created->setMessage(QStringLiteral("The new page is in a separate window."));
+    if (created) {
+        created->window()->show();
+        m_engine.addView(created, m_pendingPages.take(created->id()));
+        created->setMessage(QStringLiteral("The new page is in a separate window."));
+    }
 }
 void BrowserController::navigate(BrowserView *view, const QUrl &url) { m_engine.navigate(view, url); }
 void BrowserController::reload(BrowserView *view) { m_engine.reload(view); }
@@ -102,8 +124,13 @@ void BrowserController::closeView(BrowserView *view)
 {
     if (!view || !m_views.contains(view->id())) return;
     m_views.remove(view->id());
-    m_splitCandidates.remove(view->id());
+    cancelSplit(view);
+    m_pendingPages.remove(view->id());
+    const auto sources = m_splitCandidates.keys();
+    for (const auto &source : sources)
+        if (m_splitCandidates.value(source) == view) m_splitCandidates.remove(source);
     m_engine.closeView(view);
+    view->stopMenuExport();
     if (view->window()) view->window()->deleteLater();
     view->deleteLater();
     if (m_views.isEmpty()) {

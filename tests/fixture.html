@@ -8,6 +8,11 @@ button { font: inherit; margin-top: 24px; }
 main { max-width: 700px; }
 </style>
 <input id="entry" aria-label="Gecko input test" placeholder="Type here">
+<script>
+window.testEvents = [];
+document.addEventListener('pointerdown', e => testEvents.push([e.type, e.target.id, e.clientX, e.clientY]));
+document.addEventListener('keydown', e => testEvents.push([e.type, e.key]));
+</script>
 <main>
 <h1>Real Gecko content in a native QindaTK window</h1>
 <p>This local fixture checks input, navigation, native windows and real rendered pixels.</p>

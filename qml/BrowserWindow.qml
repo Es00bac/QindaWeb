@@ -11,8 +11,15 @@ Tk.AppWindow {
     required property BrowserController browser
     objectName: "browserWindow-" + view.id
     title: view.title + " — QindaWeb"
+    property bool temporaryAddress: false
+    minimumWidth: view.chromeVisible ? Tk.Theme.size.control * 14 : Tk.Theme.size.control * 4
+    minimumHeight: view.chromeVisible ? Tk.Theme.size.control * 8 : Tk.Theme.size.control * 3
+    toolBarsVisible: view.chromeVisible || temporaryAddress
+    statusBarVisible: view.chromeVisible
     TkQt.QindaQtTheme { }
     menuBar: Tk.MenuBar {
+        visible: view.chromeVisible && !view.globalMenuAvailable
+        height: visible ? implicitHeight : 0
         Tk.Menu {
             title: qsTr("&File")
             Tk.MenuItem { commandRegistry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.new-tab" }
@@ -28,11 +35,15 @@ Tk.AppWindow {
             Tk.MenuItem { commandRegistry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.reload" }
             Tk.MenuItem { commandRegistry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.address" }
         }
+        Tk.Menu {
+            title: qsTr("&View")
+            Tk.MenuItem { commandRegistry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.chrome" }
+        }
     }
     toolBars: Tk.ToolBar {
-        Tk.CommandButton { registry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.back"; iconOnly: true }
-        Tk.CommandButton { registry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.forward"; iconOnly: true }
-        Tk.CommandButton { registry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.reload"; iconOnly: true }
+        Tk.CommandButton { visible: view.chromeVisible; registry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.back"; iconOnly: true }
+        Tk.CommandButton { visible: view.chromeVisible; registry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.forward"; iconOnly: true }
+        Tk.CommandButton { visible: view.chromeVisible; registry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.reload"; iconOnly: true }
         Tk.TextField {
             id: address
             objectName: "browserAddress"
@@ -42,14 +53,15 @@ Tk.AppWindow {
             Tk.Flex.grow: 1
             Tk.Flex.basis: 0
             text: view.url.toString() === "about:blank" ? "" : view.url.toString()
-            onAccepted: if (view.navigate(text)) page.takeFocus()
+            onAccepted: if (view.navigate(text)) { temporaryAddress = false; page.takeFocus() }
             Keys.onEscapePressed: {
                 text = view.url.toString() === "about:blank" ? "" : view.url.toString()
                 page.takeFocus()
+                temporaryAddress = false
             }
         }
-        Tk.CommandButton { registry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.new-tab"; iconOnly: true }
-        Tk.CommandButton { registry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.new-split"; iconOnly: true }
+        Tk.CommandButton { visible: view.chromeVisible; registry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.new-tab"; iconOnly: true }
+        Tk.CommandButton { visible: view.chromeVisible; registry: view.commands; shortcutMap: view.shortcuts; commandId: "browser.new-split"; iconOnly: true }
     }
     Item {
         id: content
@@ -88,13 +100,22 @@ Tk.AppWindow {
             Tk.Flex.basis: 0
         }
         Tk.Caption { text: browser.engineIdentity; Accessible.name: qsTr("Web engine: ") + browser.engineIdentity }
+        Tk.Caption {
+            visible: !browser.desktopThemeReady
+            text: qsTr("Toolkit theme")
+            Accessible.name: qsTr("Desktop theme unavailable. ") + browser.desktopThemeError
+        }
     }
     PlacementChooser { id: placement; view: window.view; parent: window.contentItem }
     Connections {
         target: view
-        function onFocusAddressRequested() { address.forceActiveFocus(); address.selectAll() }
+        function onFocusAddressRequested() {
+            if (!view.chromeVisible) window.temporaryAddress = true
+            address.forceActiveFocus(); address.selectAll()
+        }
         function onPlacementRequested() { placement.open() }
         function onChanged() {
+            if (view.chromeVisible) window.temporaryAddress = false
             if (!address.activeFocus)
                 address.text = view.url.toString() === "about:blank" ? "" : view.url.toString()
         }

@@ -11,6 +11,7 @@
 class QQuickWindow;
 namespace QindaWeb {
 class BrowserController;
+class GlobalMenuExport;
 class BrowserView final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString id READ id CONSTANT)
@@ -19,18 +20,26 @@ class BrowserView final : public QObject {
     Q_PROPERTY(bool loading READ loading NOTIFY changed)
     Q_PROPERTY(bool ready READ ready NOTIFY changed)
     Q_PROPERTY(QString message READ message NOTIFY changed)
+    Q_PROPERTY(bool chromeVisible READ chromeVisible WRITE setChromeVisible NOTIFY changed)
+    Q_PROPERTY(bool globalMenuAvailable READ globalMenuAvailable NOTIFY changed)
     Q_PROPERTY(QWaylandXdgSurface *shellSurface READ shellSurface NOTIFY changed)
     Q_PROPERTY(QWaylandQuickOutput *output READ output NOTIFY changed)
     Q_PROPERTY(QindaTK::CommandRegistry *commands READ commands CONSTANT)
     Q_PROPERTY(QindaTK::ShortcutMap *shortcuts READ shortcuts CONSTANT)
 public:
     explicit BrowserView(BrowserController *controller);
+    ~BrowserView() override;
     QString id() const { return m_id; }
     QString title() const { return m_title; }
     QUrl url() const { return m_url; }
     bool loading() const { return m_loading; }
     bool ready() const { return !m_contextId.isEmpty(); }
     QString message() const { return m_message; }
+    bool chromeVisible() const { return m_chromeVisible; }
+    bool globalMenuAvailable() const;
+    QString globalMenuObjectPath() const;
+    void setChromeVisible(bool visible);
+    void stopMenuExport();
     QWaylandXdgSurface *shellSurface() const { return m_surface; }
     QWaylandQuickOutput *output() const { return m_output; }
     QindaTK::CommandRegistry *commands() { return &m_commands; }
@@ -53,6 +62,7 @@ signals:
     void focusAddressRequested();
     void placementRequested();
 private:
+    bool eventFilter(QObject *watched, QEvent *event) override;
     void installCommands();
     BrowserController *m_controller;
     const QString m_id;
@@ -61,6 +71,8 @@ private:
     QString m_message = QStringLiteral("Starting Gecko…");
     QString m_contextId;
     bool m_loading = true;
+    bool m_chromeVisible = true;
+    std::unique_ptr<GlobalMenuExport> m_globalMenu;
     QSize m_contentSize{960, 600};
     QPointer<QQuickWindow> m_window;
     QPointer<QWaylandXdgSurface> m_surface;

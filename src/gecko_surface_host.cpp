@@ -5,9 +5,11 @@
 #include <QWaylandOutputMode>
 #include <QWaylandXdgDecorationManagerV1>
 #include <QWaylandTextInputManagerV3>
+#include <QWaylandViewporter>
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QFile>
+#include <cmath>
 namespace QindaWeb {
 GeckoSurfaceHost::GeckoSurfaceHost(QObject *parent)
     : QWaylandQuickCompositor(parent),
@@ -21,6 +23,7 @@ GeckoSurfaceHost::GeckoSurfaceHost(QObject *parent)
     decorations->setExtensionContainer(this);
     decorations->setPreferredMode(QWaylandXdgToplevel::ServerSideDecoration);
     new QWaylandTextInputManagerV3(this);
+    new QWaylandViewporter(this);
     setUseHardwareIntegrationExtension(false);
 }
 QString GeckoSurfaceHost::displayName() const
@@ -48,6 +51,7 @@ QWaylandQuickOutput *GeckoSurfaceHost::addWindow(QQuickWindow *window)
     output->setManufacturer(QStringLiteral("QindaQt"));
     output->setModel(QStringLiteral("QindaWeb content"));
     output->setSizeFollowsWindow(true);
+    output->setScaleFactor(qMax(1, static_cast<int>(std::ceil(window->devicePixelRatio()))));
     const QWaylandOutputMode mode(window->size(), 60000);
     output->addMode(mode, true);
     output->setCurrentMode(mode);

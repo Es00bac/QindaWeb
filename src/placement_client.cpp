@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "placement_client.h"
+#include <QHash>
 #ifdef QINDAWEB_HAVE_PLACEMENT
 #include <qindaqt/application_window_management/client.h>
 #endif

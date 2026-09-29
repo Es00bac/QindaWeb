@@ -23,6 +23,7 @@ public:
     ~FirefoxEngine() override;
     bool start(const QString &program, const QString &profile, QString *error);
     void addView(BrowserView *view, const QUrl &url);
+    void adoptView(BrowserView *view, const QString &context, const QUrl &url);
     void closeView(BrowserView *view);
     void navigate(BrowserView *view, const QUrl &url);
     void reload(BrowserView *view);
@@ -35,17 +36,25 @@ signals:
     void failed(const QString &message);
     void ready();
     void unsolicitedContext(const QString &context, const QUrl &url);
+    void viewClosed(BrowserView *view);
 private:
     struct Creation {
         QPointer<BrowserView> view;
         QUrl url;
         QString context;
+        QString marker;
+        QString originalTitle;
         bool submitted = false;
+        bool marked = false;
+        bool navigate = true;
     };
     void processOutput();
     void establishSession();
     void nextCreation();
     void pairCreation();
+    void markCreation();
+    void rejectCreation(const QString &error);
+    void offerCandidates();
     void engineEvent(const QString &method, const QJsonObject &params);
     void fail(const QString &message);
     void viewCommand(BrowserView *view, const QString &method, QJsonObject params);
@@ -57,7 +66,9 @@ private:
     QQueue<QPointer<QWaylandXdgSurface>> m_surfaces;
     QByteArray m_output;
     QTimer m_startupTimer;
-    QString m_initialContext;
+    QTimer m_pairTimer;
+    QHash<QString, QUrl> m_candidates;
+    QStringList m_bootstrapContexts;
     QString m_identity = QStringLiteral("Gecko / Firefox (starting)");
     bool m_connected = false;
     bool m_ready = false;

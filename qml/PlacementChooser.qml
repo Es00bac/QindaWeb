@@ -24,6 +24,7 @@ Tk.Dialog {
     onClosed: if (!confirmed) view.cancelSplit()
     Tk.Flex {
         id: choices
+        objectName: "browserSplitChoices"
         direction: Tk.Flex.Column
         gap: Tk.Theme.space.md
         focus: true
