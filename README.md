@@ -22,7 +22,7 @@ Firefox/QindaFox with Wayland support. Add the public QindaQt placement SDK pref
 and `-DQINDAWEB_REQUIRE_DESKTOP_SDK=ON` to require native container integration.
 An absent SDK/compositor keeps separate windows.
 
-Ctrl+T requests a container tab, Ctrl+Alt+T creates a split candidate and offers its side,
+Ctrl+T requests a container tab, Ctrl+Shift+Enter creates a split candidate and offers its side,
 Ctrl+N opens a separate window, Ctrl+L focuses the address field and Ctrl+W closes
 the page. The side picker accepts arrow keys and native pointer/touch/pen button
 activation. The desktop's richer placement chooser is still being developed.

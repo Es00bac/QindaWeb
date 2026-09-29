@@ -11,7 +11,7 @@ void BrowserView::installCommands()
     m_commandContext.activate(scope);
     const QList<CommandDescriptor> descriptors{
         {QStringLiteral("browser.new-tab"), tr("New container tab"), QStringLiteral("plus"), tr("File"), {}, QStringLiteral("Ctrl+T")},
-        {QStringLiteral("browser.new-split"), tr("New split…"), QStringLiteral("columns-2"), tr("File"), {}, QStringLiteral("Ctrl+Alt+T")},
+        {QStringLiteral("browser.new-split"), tr("New split…"), QStringLiteral("columns-2"), tr("File"), {}, QStringLiteral("Ctrl+Shift+Return")},
         {QStringLiteral("browser.new-window"), tr("New window"), QStringLiteral("square-plus"), tr("File"), {}, QStringLiteral("Ctrl+N")},
         {QStringLiteral("browser.close"), tr("Close page"), QStringLiteral("x"), tr("File"), {}, QStringLiteral("Ctrl+W")},
         {QStringLiteral("browser.address"), tr("Focus address"), QStringLiteral("search"), tr("Navigate"), {}, QStringLiteral("Ctrl+L")},

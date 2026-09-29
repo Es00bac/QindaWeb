@@ -44,7 +44,7 @@ outer Qt windows stay ordinary. Modal engine prompts still require qualification
 App IDs/PIDs never prove foreign-surface ownership.
 
 Shortcuts, toolbar and menus share CommandRegistry. Ctrl+T creates a page and
-submits Tab relative to its source. Ctrl+Alt+T creates a page then asks for a side
+submits Tab relative to its source. Ctrl+Shift+Enter creates a page then asks for a side
 (arrow keys or native buttons); Escape keeps it separate. Ctrl+N opens an
 independent window. Ctrl+Shift+T is reserved for eventual reopen. An absent or
 refusing WM keeps the new window and reports the result.

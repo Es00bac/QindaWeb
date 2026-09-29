@@ -10,4 +10,6 @@ Use QindaTK as Tk, semantic theme roles, native accessible names, stable view/ac
 
 Install all software and runtime dependencies through Portage and QindaGentoo. Keep secrets in user configuration. Never override configured MAKEOPTS; direct builds must preserve the machine's configured job/load limits.
 
+Keep the laptop responsive for media playback: heavy builds, native runtime tests and package compilation run on qinda at low CPU/disk priority. Laptop work is limited to editing, synchronization and brief low-priority checks unless the user changes this preference. Coordinate resource use with the desktop and toolkit owners.
+
 Keep hand-written source files below 500 nonblank lines. Document ownership, lifecycle, threading and error behavior at public boundaries. Verify actual browsing and input, engine identity, window lifecycle and placement; fixtures or backend labels alone are not evidence that Gecko works. Native/physical claims require direct evidence. Push milestone commits after the appropriate checks pass.

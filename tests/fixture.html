@@ -18,6 +18,6 @@ document.addEventListener('keydown', e => testEvents.push([e.type, e.key]));
 <p>This local fixture checks input, navigation, native windows and real rendered pixels.</p>
 <a id="link" href="#navigation">Navigate to fragment</a>
 <button onclick="document.body.dataset.clicked='yes'">Pointer action</button>
-<button onclick="window.open('fixture.html?popup=1', '_blank')">New page window</button>
+<button id="popup" onclick="window.open('fixture.html?popup=1', '_blank')">New page window</button>
 <p id="navigation">Navigation target</p>
 </main>

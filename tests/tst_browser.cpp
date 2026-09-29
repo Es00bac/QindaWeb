@@ -13,6 +13,8 @@
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCallWatcher>
+#include <QJsonDocument>
+#include <QFile>
 #include <qindaqt/shell/global_menu/dbusmenu/dbusmenu_wire.h>
 namespace MenuWire = QindaQt::Shell::GlobalMenu::DbusMenu;
 class BrowserTest : public QObject {
@@ -51,6 +53,22 @@ private:
         return items;
     }
 private slots:
+    void existingProfilesArePreserved() {
+        QTemporaryDir profile;
+        QFile existing(profile.filePath(QStringLiteral("user.js")));
+        QVERIFY(existing.open(QIODevice::WriteOnly));
+        const QByteArray original("// Existing user's Firefox settings\n");
+        QCOMPARE(existing.write(original), original.size());
+        existing.close();
+        QString error;
+        QVERIFY(!QindaWeb::prepareProfile(profile.path(), &error));
+        QVERIFY(!error.isEmpty());
+        QVERIFY(existing.open(QIODevice::ReadOnly));
+        QCOMPARE(existing.readAll(), original);
+        QTemporaryDir owned;
+        QVERIFY2(QindaWeb::prepareProfile(owned.path(), &error), qPrintable(error));
+        QVERIFY2(QindaWeb::prepareProfile(owned.path(), &error), qPrintable(error));
+    }
     void realGeckoAndNativeWindows() {
         QTemporaryDir profile;
         QVERIFY(profile.isValid());
@@ -130,6 +148,23 @@ private slots:
         QTRY_VERIFY(view->chromeVisible());
         qInfo() << "Native global-menu protocol detected:" << view->globalMenuAvailable();
         qInfo() << "Desktop theme published:" << browser.desktopThemeReady() << browser.desktopThemeError();
+        page->takeFocus();
+        const auto button = QJsonDocument::fromJson(evaluate(browser, view,
+            QStringLiteral("JSON.stringify((() => { const r = document.querySelector('#popup').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })())")).toUtf8()).object();
+        QVERIFY(!button.isEmpty());
+        QTest::mouseClick(view->window(), Qt::LeftButton, {},
+            page->mapToScene(page->mapFromSurface(QPointF(button.value(QStringLiteral("x")).toDouble(), button.value(QStringLiteral("y")).toDouble()))).toPoint());
+        QTRY_COMPARE_WITH_TIMEOUT(browser.views().size(), 2, 20000);
+        QindaWeb::BrowserView *popup = nullptr;
+        for (auto *candidate : browser.views()) if (candidate != view) popup = candidate;
+        QVERIFY(popup);
+        QTRY_VERIFY_WITH_TIMEOUT(popup->ready(), 20000);
+        QCOMPARE(evaluate(browser, popup, QStringLiteral("document.title")), QStringLiteral("QindaWeb Gecko acceptance"));
+        QCOMPARE(evaluate(browser, popup, QStringLiteral("location.search")), QStringLiteral("?popup=1"));
+        (void)evaluate(browser, popup, QStringLiteral("window.close(); 'closed'"));
+        QTRY_COMPARE_WITH_TIMEOUT(browser.views().size(), 1, 10000);
+        view->window()->requestActivate();
+        page->takeFocus();
         QTest::keyClick(view->window(), Qt::Key_T, Qt::ControlModifier);
         QTRY_COMPARE(browser.views().size(), 2);
         QindaWeb::BrowserView *second = nullptr;
@@ -141,7 +176,7 @@ private slots:
         browser.closeView(second);
         QTRY_COMPARE(browser.views().size(), 1);
         view->window()->requestActivate();
-        QTest::keyClick(view->window(), Qt::Key_T, Qt::ControlModifier | Qt::AltModifier);
+        QTest::keyClick(view->window(), Qt::Key_Return, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_COMPARE(browser.views().size(), 2);
         auto *chooser = view->window()->findChild<QObject *>(QStringLiteral("browserPlacementChooser"));
         QVERIFY(chooser);
