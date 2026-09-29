@@ -64,6 +64,8 @@ void FirefoxEngine::markCreation()
     auto &creation = m_creation.head();
     const QString context = creation.context;
     creation.marker = QStringLiteral("QindaWeb surface ") + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    creation.marked = false;
+    const QString marker = creation.marker;
     // Pair by an unpredictable marker on this exact owned browsing context,
     // not arrival order: a web popup may race an app-requested window.
     const QString expression = QStringLiteral("(() => { const old = document.title; document.title = %1; return old; })()")
@@ -71,8 +73,8 @@ void FirefoxEngine::markCreation()
     m_bidi.request(QStringLiteral("script.evaluate"),
         {{QStringLiteral("expression"), expression}, {QStringLiteral("awaitPromise"), false},
          {QStringLiteral("target"), QJsonObject{{QStringLiteral("context"), context}}}},
-        [this, context](const QJsonObject &result, const QString &error) {
-            if (m_creation.isEmpty() || m_creation.head().context != context) return;
+        [this, context, marker](const QJsonObject &result, const QString &error) {
+            if (m_creation.isEmpty() || m_creation.head().context != context || m_creation.head().marker != marker) return;
             if (!error.isEmpty() || result.value(QStringLiteral("type")).toString() != QStringLiteral("success")) {
                 rejectCreation(QStringLiteral("Gecko could not identify its page window."));
                 return;
@@ -89,6 +91,7 @@ void FirefoxEngine::rejectCreation(const QString &error)
     if (m_creation.isEmpty()) return;
     const auto rejected = m_creation.dequeue();
     if (rejected.view) { rejected.view->setLoading(false); rejected.view->setMessage(error); }
+    else if (rejected.unsolicited) qWarning().noquote() << "QindaWeb popup creation:" << error;
     if (!rejected.context.isEmpty())
         m_bidi.request(QStringLiteral("browsingContext.close"), {{QStringLiteral("context"), rejected.context}});
     nextCreation();

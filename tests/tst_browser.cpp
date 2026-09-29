@@ -154,6 +154,7 @@ private slots:
         QVERIFY(!button.isEmpty());
         QTest::mouseClick(view->window(), Qt::LeftButton, {},
             page->mapToScene(page->mapFromSurface(QPointF(button.value(QStringLiteral("x")).toDouble(), button.value(QStringLiteral("y")).toDouble()))).toPoint());
+        qInfo().noquote() << "Fixture popup pointer trace" << evaluate(browser, view, QStringLiteral("JSON.stringify(window.testEvents)"));
         QTRY_COMPARE_WITH_TIMEOUT(browser.views().size(), 2, 20000);
         QindaWeb::BrowserView *popup = nullptr;
         for (auto *candidate : browser.views()) if (candidate != view) popup = candidate;

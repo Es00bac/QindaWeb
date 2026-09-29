@@ -171,6 +171,19 @@ void FirefoxEngine::engineEvent(const QString &method, const QJsonObject &params
     const QString context = params.value(QStringLiteral("context")).toString();
     auto *view = m_views.value(context).data();
     if (!view) {
+        if (params.contains(QStringLiteral("url"))) {
+            const QUrl url(params.value(QStringLiteral("url")).toString());
+            if (m_candidates.contains(context)) m_candidates[context] = url;
+            for (auto &creation : m_creation)
+                if (creation.context == context && creation.unsolicited) creation.url = url;
+        }
+        // A web-created window can navigate while GTK is still creating its
+        // Wayland toplevel. Mark the current document again after navigation;
+        // a marker on the initial about:blank document may already be gone.
+        if (!m_creation.isEmpty() && m_creation.head().unsolicited &&
+            m_creation.head().context == context && m_creation.head().submitted &&
+            (method == QStringLiteral("browsingContext.domContentLoaded") || method == QStringLiteral("browsingContext.load")))
+            markCreation();
         // App-requested creation is paired by its response. Unrequested top
         // levels are recorded separately; subframes never become app windows.
         if (method == QStringLiteral("browsingContext.contextCreated") && m_ready &&
