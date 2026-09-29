@@ -189,6 +189,55 @@ private slots:
         qInfo().noquote() << "Verified" << browser.engineIdentity() << "rendered pixels, pointer/key input, hidden chrome, temporary address, D-Bus menu activation, Ctrl+L/T, split picker, distinct window/view IDs";
         QDBusConnection::disconnectFromBus(QStringLiteral("qindaweb-menu-test"));
     }
+    void nativeContainerPlacement() {
+        if (!qEnvironmentVariableIsSet("QINDAWEB_NATIVE_PLACEMENT"))
+            QSKIP("Run in the agreed private compositor fixture for actual placement acceptance.");
+        QTemporaryDir profile;
+        QQmlApplicationEngine qml;
+        QindaWeb::BrowserController browser(&qml);
+        QSignalSpy placement(&browser, &QindaWeb::BrowserController::placementFinished);
+        QString error;
+        QVERIFY2(browser.start(QindaWeb::firefoxExecutable(), profile.path(), &error), qPrintable(error));
+        auto *source = browser.newView(nullptr, {}, QUrl::fromLocalFile(QStringLiteral(QINDAWEB_FIXTURE)));
+        QVERIFY(source);
+        QTRY_VERIFY_WITH_TIMEOUT(source->ready() && !source->loading(), 35000);
+        QTRY_VERIFY(browser.placementAvailable());
+        source->window()->setTitle(QStringLiteral("Native QindaWeb source"));
+        source->window()->requestActivate();
+        QTRY_VERIFY(source->window()->isActive());
+        QTest::keyClick(source->window(), Qt::Key_T, Qt::ControlModifier);
+        QTRY_COMPARE(browser.views().size(), 2);
+        QindaWeb::BrowserView *tab = nullptr;
+        for (auto *candidate : browser.views()) if (candidate != source) tab = candidate;
+        QVERIFY(tab);
+        QTRY_COMPARE_WITH_TIMEOUT(placement.size(), 1, 10000);
+        QCOMPARE(placement.at(0).at(0).toString(), tab->id());
+        QVERIFY2(placement.at(0).at(1).toBool(), qPrintable(placement.at(0).at(3).toString()));
+        const QString container = placement.at(0).at(2).toString();
+        QVERIFY(!container.isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(tab->ready() && tab->shellSurface() && tab->shellSurface()->surface()->hasContent(), 20000);
+        tab->window()->setTitle(QStringLiteral("Native QindaWeb tab"));
+        qInfo().noquote() << "QINDAWEB_NATIVE_TAB_READY" << container;
+        QTest::qWait(1000); // Retain live windows while the driver captures scene evidence.
+        tab->window()->requestActivate();
+        QTRY_VERIFY(tab->window()->isActive());
+        QTest::keyClick(tab->window(), Qt::Key_Return, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_COMPARE(browser.views().size(), 3);
+        auto *chooser = tab->window()->findChild<QObject *>(QStringLiteral("browserPlacementChooser"));
+        QTRY_VERIFY(chooser->property("opened").toBool());
+        QTest::keyClick(tab->window(), Qt::Key_Right);
+        QTRY_COMPARE_WITH_TIMEOUT(placement.size(), 2, 10000);
+        QVERIFY2(placement.at(1).at(1).toBool(), qPrintable(placement.at(1).at(3).toString()));
+        QCOMPARE(placement.at(1).at(2).toString(), container);
+        QindaWeb::BrowserView *split = nullptr;
+        for (auto *candidate : browser.views()) if (candidate != source && candidate != tab) split = candidate;
+        QVERIFY(split);
+        QCOMPARE(placement.at(1).at(0).toString(), split->id());
+        QTRY_VERIFY_WITH_TIMEOUT(split->ready() && split->shellSurface() && split->shellSurface()->surface()->hasContent(), 20000);
+        split->window()->setTitle(QStringLiteral("Native QindaWeb split"));
+        qInfo().noquote() << "QINDAWEB_NATIVE_SPLIT_READY" << container;
+        QTest::qWait(1000);
+    }
 };
 int main(int argc, char **argv) {
     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);

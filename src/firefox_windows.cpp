@@ -63,6 +63,7 @@ void FirefoxEngine::markCreation()
 {
     auto &creation = m_creation.head();
     const QString context = creation.context;
+    const QString previousMarker = creation.marker;
     creation.marker = QStringLiteral("QindaWeb surface ") + QUuid::createUuid().toString(QUuid::WithoutBraces);
     creation.marked = false;
     const QString marker = creation.marker;
@@ -73,13 +74,14 @@ void FirefoxEngine::markCreation()
     m_bidi.request(QStringLiteral("script.evaluate"),
         {{QStringLiteral("expression"), expression}, {QStringLiteral("awaitPromise"), false},
          {QStringLiteral("target"), QJsonObject{{QStringLiteral("context"), context}}}},
-        [this, context, marker](const QJsonObject &result, const QString &error) {
+        [this, context, marker, previousMarker](const QJsonObject &result, const QString &error) {
             if (m_creation.isEmpty() || m_creation.head().context != context || m_creation.head().marker != marker) return;
             if (!error.isEmpty() || result.value(QStringLiteral("type")).toString() != QStringLiteral("success")) {
                 rejectCreation(QStringLiteral("Gecko could not identify its page window."));
                 return;
             }
-            m_creation.head().originalTitle = result.value(QStringLiteral("result")).toObject().value(QStringLiteral("value")).toString();
+            const QString title = result.value(QStringLiteral("result")).toObject().value(QStringLiteral("value")).toString();
+            if (title != previousMarker) m_creation.head().originalTitle = title;
             m_creation.head().marked = true;
             m_pairTimer.start();
             pairCreation();

@@ -39,6 +39,9 @@ public:
     FirefoxEngine *engine() { return &m_engine; }
     QList<BrowserView *> views() const;
 signals:
+    // GUI-thread completion of the public desktop request, never inferred
+    // from mapping. IDs stay meaningful after the borrowed windows close.
+    void placementFinished(const QString &viewId, bool accepted, const QString &containerId, const QString &message);
     void placementAvailableChanged();
     void engineIdentityChanged();
     void desktopThemeChanged();

@@ -22,9 +22,12 @@ BrowserController::BrowserController(QQmlApplicationEngine *qml, QObject *parent
     connect(&m_engine, &FirefoxEngine::viewClosed, this, &BrowserController::closeView);
     connect(&m_placement, &PlacementClient::availableChanged, this, &BrowserController::placementAvailableChanged);
     connect(&m_placement, &PlacementClient::finished, this,
-        [this](quint32 id, bool accepted, const QString &, const QString &message) {
+        [this](quint32 id, bool accepted, const QString &container, const QString &message) {
             const auto view = m_placements.take(id);
-            if (view) view->setMessage(accepted ? QString() : message);
+            if (view) {
+                view->setMessage(accepted ? QString() : message);
+                emit placementFinished(view->id(), accepted, container, message);
+            }
         });
 }
 BrowserController::~BrowserController()
@@ -91,7 +94,10 @@ void BrowserController::submitPlacement(BrowserView *source, BrowserView *create
     QString error;
     const quint32 id = m_placement.place(source->window(), created->window(), placement, &error);
     if (id) m_placements.insert(id, created);
-    else created->setMessage(error);
+    else {
+        created->setMessage(error);
+        emit placementFinished(created->id(), false, {}, error);
+    }
 }
 void BrowserController::beginSplit(BrowserView *source)
 {
