@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>QindaWeb Gecko acceptance</title>
+<style>
+body { font: 18px sans-serif; margin: 24px; background: #ecf6ff; color: #123; }
+input { box-sizing: border-box; width: 320px; height: 40px; font: inherit; }
+button { font: inherit; margin-top: 24px; }
+main { max-width: 700px; }
+</style>
+<input id="entry" aria-label="Gecko input test" placeholder="Type here">
+<main>
+<h1>Real Gecko content in a native QindaTK window</h1>
+<p>This local fixture checks input, navigation, native windows and real rendered pixels.</p>
+<a id="link" href="#navigation">Navigate to fragment</a>
+<button onclick="document.body.dataset.clicked='yes'">Pointer action</button>
+<button onclick="window.open('fixture.html?popup=1', '_blank')">New page window</button>
+<p id="navigation">Navigation target</p>
+</main>

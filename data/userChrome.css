@@ -1,0 +1,10 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Firefox owns content and its native prompts. QindaTK owns browser controls.
+ * Scope this only to navigator:browser, leaving engine dialogs intact.
+ */
+@-moz-document url("chrome://browser/content/browser.xhtml") {
+    #navigator-toolbox, #sidebar-main, #sidebar-box {
+        visibility: collapse !important;
+    }
+    #browser { border: none !important; }
+}
