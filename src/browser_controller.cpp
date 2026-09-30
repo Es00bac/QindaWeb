@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <QCoreApplication>
 #include <QEvent>
+#include <QWaylandSeat>
 namespace QindaWeb {
 BrowserController::BrowserController(QQmlApplicationEngine *qml, QObject *parent)
     : QObject(parent), m_qml(qml), m_appearance(qml), m_engine(&m_host)
@@ -155,7 +156,11 @@ void BrowserController::cancelSplit(BrowserView *source)
 void BrowserController::navigate(BrowserView *view, const QUrl &url) { m_engine.navigate(view, url); }
 void BrowserController::reload(BrowserView *view) { m_engine.reload(view); }
 void BrowserController::traverse(BrowserView *view, int delta) { m_engine.traverse(view, delta); }
-void BrowserController::activate(BrowserView *) { }
+void BrowserController::activate(BrowserView *view)
+{
+    if (view && view->window() && view->window()->isActive() && view->shellSurface())
+        m_host.defaultSeat()->setKeyboardFocus(view->shellSurface()->surface());
+}
 void BrowserController::closeView(BrowserView *view)
 {
     if (!view || !m_views.contains(view->id())) return;

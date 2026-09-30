@@ -61,6 +61,7 @@ void BrowserView::setSurface(QWaylandXdgSurface *surface)
         emit changed();
     });
     resizeContent(m_contentSize.width(), m_contentSize.height());
+    m_controller->activate(this);
     emit changed();
 }
 void BrowserView::setContextId(const QString &context)

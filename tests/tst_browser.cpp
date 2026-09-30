@@ -8,6 +8,7 @@
 #include <QQuickWindow>
 #include <QWaylandQuickShellSurfaceItem>
 #include <QWaylandSurface>
+#include <QWaylandSeat>
 #include <QTemporaryDir>
 #include <QDir>
 #include <QDBusConnection>
@@ -17,6 +18,17 @@
 #include <QFile>
 #include <qindaqt/shell/global_menu/dbusmenu/dbusmenu_wire.h>
 namespace MenuWire = QindaQt::Shell::GlobalMenu::DbusMenu;
+class KeyTrace : public QObject {
+public:
+    QStringList events;
+    bool eventFilter(QObject *, QEvent *event) override {
+        if (event->type() == QEvent::KeyPress) {
+            const auto *key = static_cast<QKeyEvent *>(event);
+            events.append(QStringLiteral("%1/%2/%3").arg(key->key()).arg(key->nativeScanCode()).arg(key->nativeVirtualKey()));
+        }
+        return false;
+    }
+};
 class BrowserTest : public QObject {
     Q_OBJECT
 private:
@@ -104,13 +116,20 @@ private slots:
         QTest::qWait(200);
         qInfo().noquote() << "Fixture pointer trace" << evaluate(browser, view, QStringLiteral("JSON.stringify(window.testEvents)"));
         const bool nativeInput = qEnvironmentVariableIsSet("QINDAWEB_NATIVE_PLACEMENT");
+        KeyTrace keys;
+        view->window()->installEventFilter(&keys);
+        qInfo() << "Fixture keyboard focus" << view->window()->isActive() << page->hasActiveFocus()
+                << (page->surface()->compositor()->defaultSeat()->keyboardFocus() == page->surface());
         if (nativeInput) qInfo().noquote() << "QINDAWEB_FIXTURE_INPUT_READY";
         else for (Qt::Key key : {Qt::Key_G, Qt::Key_E, Qt::Key_C, Qt::Key_K, Qt::Key_O})
             QTest::keyClick(view->window(), key);
         // The native runner uses the compositor's existing C/N/V allowlist
         // through its normal keyboard chain, never host uinput or BiDi typing.
-        QTRY_COMPARE_WITH_TIMEOUT(evaluate(browser, view, QStringLiteral("document.querySelector('#entry').value")),
-            nativeInput ? QStringLiteral("cnv") : QStringLiteral("gecko"), 5000);
+        const QString expectedInput = nativeInput ? QStringLiteral("cnv") : QStringLiteral("gecko");
+        const bool typed = QTest::qWaitFor([&] { return evaluate(browser, view, QStringLiteral("document.querySelector('#entry').value")) == expectedInput; }, 5000);
+        qInfo() << "Fixture native key trace" << keys.events;
+        qInfo().noquote() << "Fixture document key trace" << evaluate(browser, view, QStringLiteral("JSON.stringify(window.testEvents)"));
+        QVERIFY2(typed, "Gecko did not receive the expected fixture text");
         QTest::keyClick(view->window(), Qt::Key_H, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY(!view->chromeVisible());
         auto *content = view->window()->findChild<QQuickItem *>(QStringLiteral("browserContent"));
