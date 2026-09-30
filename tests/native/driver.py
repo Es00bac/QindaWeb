@@ -20,7 +20,7 @@ def main():
     evidence = dict(mappedLibraries=mapped, snapshots=[])
     titles = {name: "Native QindaWeb " + name + " — QindaWeb" for name in ("source", "tab", "split", "grouped tab")}
     with (output / "probe.log").open("w") as log:
-        child = subprocess.Popen([os.environ["QINDAWEB_NATIVE_PROBE"], "nativeContainerPlacement", "-v1"], env=env, stdout=log, stderr=subprocess.STDOUT)
+        child = subprocess.Popen([os.environ["QINDAWEB_NATIVE_PROBE"], "-v1"], env=env, stdout=log, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + 80
             while child.poll() is None and time.monotonic() < deadline:

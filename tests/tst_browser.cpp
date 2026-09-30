@@ -247,6 +247,14 @@ private slots:
         QTest::qWait(1000);
         split->window()->requestActivate();
         QTRY_VERIFY(split->window()->isActive());
+        QTest::keyClick(split->window(), Qt::Key_H, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_VERIFY(!split->chromeVisible());
+        auto *content = split->window()->findChild<QQuickItem *>(QStringLiteral("browserContent"));
+        QVERIFY(content);
+        QTRY_COMPARE(qRound(content->height()), split->window()->height());
+        const auto menu = menuCall(split, QStringLiteral("GetLayout"), {0, -1, QStringList{}});
+        QVERIFY2(menu.type() == QDBusMessage::ReplyMessage, qPrintable(menu.errorMessage()));
+        QDBusConnection::disconnectFromBus(QStringLiteral("qindaweb-menu-test"));
         QTest::keyClick(split->window(), Qt::Key_T, Qt::ControlModifier);
         QTRY_COMPARE(browser.views().size(), 4);
         QTRY_COMPARE_WITH_TIMEOUT(placement.size(), 3, 10000);
@@ -255,6 +263,7 @@ private slots:
         QindaWeb::BrowserView *grouped = nullptr;
         for (auto *candidate : browser.views()) if (candidate != source && candidate != tab && candidate != split) grouped = candidate;
         QVERIFY(grouped);
+        QVERIFY(!grouped->chromeVisible());
         QCOMPARE(placement.at(2).at(0).toString(), grouped->id());
         QTRY_VERIFY_WITH_TIMEOUT(grouped->ready() && !grouped->loading(), 20000);
         QCOMPARE(evaluate(browser, grouped, QStringLiteral("document.title = 'Native QindaWeb grouped tab'; 'named'")), QStringLiteral("named"));
