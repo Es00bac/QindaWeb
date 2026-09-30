@@ -49,6 +49,11 @@ submits Tab relative to its source. Ctrl+Shift+Enter creates a page then asks fo
 independent window. Ctrl+Shift+T is reserved for eventual reopen. An absent or
 refusing WM keeps the new window and reports the result.
 
+The client submits placement after the new Qt window's first committed frame,
+on the GUI thread. A shell handle or isVisible() alone can precede the desktop's
+normal mapped-window state. There is one request, a five-second mapping deadline,
+and the public SDK's real completion status; no retry or invented acceptance.
+
 The split candidate is initially unmapped and its Gecko context starts only after
 placement confirmation or cancellation. This leaves keyboard focus with the source
 picker. Confirmation maps the Qt window and submits its owned surface to the SDK;
@@ -76,6 +81,17 @@ commands. Engine transport stays private; no second external agent protocol.
 Content accessibility relationships, IME, clipboard/drag-and-drop, popups,
 scaling, prompts, persistence and crash recovery need direct native evidence
 before declaring desktop integration complete.
+
+Normal Gecko typing depends on a Qt WaylandCompositor fix tracked in QindaGentoo.
+Firefox registers two wl_keyboard resources on one wl_client: GTK's input listener
+and Mozilla's seat tracker. Qt 6.11.1 originally delivered focus, keys and modifiers
+to only one. The package patch fans those events out to every listener and keeps
+focus valid when the representative binding is released. It changes no public
+ABI or private object layout. A raw protocol test exercises two listeners, late
+binding, removal, focus transfer and explicit modifier publication. Native tests
+also prove Gecko's listeners belong to the page surface's single client and
+receive scan-code input through the desktop's normal keyboard chain. Zero-scan
+QtTest text events can use the IME path and do not establish this behavior.
 
 Sources: [Qt buffer and input hosting](https://doc.qt.io/qt-6/qwaylandquickitem.html),
 [Firefox BiDi connection](https://developer.mozilla.org/en-US/docs/Web/WebDriver/How_to/Create_BiDi_connection),

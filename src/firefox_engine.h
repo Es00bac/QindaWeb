@@ -49,6 +49,8 @@ private:
         bool marked = false;
         bool navigate = true;
         bool unsolicited = false;
+        bool marking = false;
+        bool remarkPending = false;
     };
     void processOutput();
     void establishSession();

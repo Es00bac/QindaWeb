@@ -62,6 +62,11 @@ void FirefoxEngine::nextCreation()
 void FirefoxEngine::markCreation()
 {
     auto &creation = m_creation.head();
+    // DOMContentLoaded and load can both arrive before evaluation completes.
+    // Serialize remarking so an obsolete callback cannot discard the original
+    // title, or set another nonce after the context/surface has been adopted.
+    if (creation.marking) { creation.remarkPending = true; return; }
+    creation.marking = true;
     const QString context = creation.context;
     const QString previousMarker = creation.marker;
     creation.marker = QStringLiteral("QindaWeb surface ") + QUuid::createUuid().toString(QUuid::WithoutBraces);
@@ -82,6 +87,12 @@ void FirefoxEngine::markCreation()
             }
             const QString title = result.value(QStringLiteral("result")).toObject().value(QStringLiteral("value")).toString();
             if (title != previousMarker) m_creation.head().originalTitle = title;
+            m_creation.head().marking = false;
+            if (m_creation.head().remarkPending) {
+                m_creation.head().remarkPending = false;
+                markCreation();
+                return;
+            }
             m_creation.head().marked = true;
             m_pairTimer.start();
             pairCreation();

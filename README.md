@@ -7,20 +7,29 @@ buffers inside native Qt/QindaTK windows. No Chromium backend is included.
 The [architecture](docs/architecture.md) describes this host and a later direct
 Gecko adapter. [Coordination](docs/coordination.md) tracks toolkit and desktop work.
 
-Build for development; install through Portage:
+Build and test on qinda at low priority while the laptop is used for playback.
+Install through Portage. Native development requires the public placement SDK:
 
 ```sh
-cmake -S . -B build/dev -G Ninja -DCMAKE_BUILD_TYPE=Debug
-ninja -C build/dev -j32 -l16 # qinda-top; qinda uses its configured -j24 -l24
-ctest --test-dir build/dev --output-on-failure
+cmake -S . -B build/dev -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+  -DQINDAWEB_REQUIRE_DESKTOP_SDK=ON -DCMAKE_PREFIX_PATH="$sdk_prefix"
+nice -n 10 ionice -c 3 cmake --build build/dev --parallel 8 -- -l24
+nice -n 10 ionice -c 3 ctest --test-dir build/dev --output-on-failure
 build/dev/qindaweb https://example.org
 ```
 
 Dependencies: Qt 6.11 Quick, WebSockets and WaylandCompositor; QindaTK with its
 QindaQt bridge; QindaQt's public menu/settings/theme libraries; KWayland; installed
-Firefox/QindaFox with Wayland support. Add the public QindaQt placement SDK prefix
-and `-DQINDAWEB_REQUIRE_DESKTOP_SDK=ON` to require native container integration.
-An absent SDK/compositor keeps separate windows.
+Firefox/QindaFox with Wayland support. Qt WaylandCompositor needs the overlay's
+multiple-keyboard-resource patch: Firefox's GTK and Mozilla listeners share one
+Wayland client. Unpatched Qt silently loses normal page typing. An absent or
+refusing compositor keeps the new window separate and reports the result.
+`QINDAWEB_REQUIRE_DESKTOP_SDK=OFF` explicitly permits building that fallback.
+
+The manager currently allocates eight browser compilation jobs within qinda's
+configured maximum of 24 jobs/load 24. Reconfirm concurrent capacity before
+increasing it; preserve configured MAKEOPTS for Portage. No laptop build or
+native runtime test is part of this workflow.
 
 Ctrl+T requests a container tab, Ctrl+Shift+Enter creates a split candidate and offers its side,
 Ctrl+N opens a separate window, Ctrl+L focuses the address field and Ctrl+W closes
@@ -39,3 +48,5 @@ creates and marks its own Firefox profile; it refuses to overwrite existing prof
 
 Heavy builds and runtime tests run on qinda while the laptop is in use. See
 [acceptance](docs/acceptance.md) for verified behavior and remaining qualification.
+The native Portage recipe awaits the desktop owner's consolidated SDK package;
+development staging is never copied into an installed browser.
