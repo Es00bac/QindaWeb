@@ -23,8 +23,8 @@ public:
         int maps = 0, enters = 0, leaves = 0, presses = 0, releases = 0, modifiers = 0;
         quint32 lastKey = 0;
     };
-    explicit WireClient(const QByteArray &socket, int initialKeyboards)
-        : display(wl_display_connect(socket.constData())), initial(initialKeyboards) {
+    explicit WireClient(QWaylandCompositor &host, int initialKeyboards)
+        : display(wl_display_connect(host.socketName().constData())), initial(initialKeyboards), server(host) {
         if (!display) return;
         registry = wl_display_get_registry(display);
         static const wl_registry_listener listener{
@@ -87,6 +87,10 @@ public:
     void pump() {
         if (!display) return;
         wl_display_flush(display);
+        // This wire client and server share a GUI thread. Flush explicitly;
+        // QTest's bounded polling need not reach the dispatcher's idle flush.
+        server.processWaylandEvents();
+        wl_display_flush_clients(server.display());
         wl_display_dispatch_pending(display);
         pollfd fd{wl_display_get_fd(display), POLLIN, 0};
         if (::poll(&fd, 1, 0) > 0 && (fd.revents & POLLIN)) wl_display_dispatch(display);
@@ -100,6 +104,7 @@ public:
 private:
     int initial;
     bool initialized = false;
+    QWaylandCompositor &server;
 };
 
 class KeyboardTest : public QObject {
@@ -115,7 +120,7 @@ private slots:
         connect(&host, &QWaylandCompositor::surfaceCreated, this, [&](QWaylandSurface *surface) { surfaces.append(surface); });
         host.create();
         QVERIFY(host.isCreated());
-        WireClient first(host.socketName(), 2);
+        WireClient first(host, 2);
         QVERIFY(first.display);
         const auto wait = [&](auto predicate) {
             return QTest::qWaitFor([&] { first.pump(); return predicate(); }, 3000);
@@ -148,7 +153,7 @@ private slots:
         keyboard->sendKeyPressEvent(54);
         QVERIFY(wait([&] { return first.keyboards[0]->presses == 2 && first.keyboards[1]->presses == 2; }));
         keyboard->sendKeyReleaseEvent(54);
-        WireClient other(host.socketName(), 1);
+        WireClient other(host, 1);
         QVERIFY(other.display);
         QVERIFY(QTest::qWaitFor([&] { first.pump(); other.pump(); return surfaces.size() == 2 && other.keyboards.size() == 1 && other.keyboards[0]->maps; }, 3000));
         QVERIFY(seat->setKeyboardFocus(surfaces[1]));
