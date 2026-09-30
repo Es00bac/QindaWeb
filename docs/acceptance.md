@@ -51,6 +51,20 @@ profile persistence and crash recovery. GPU acceleration and physical pen/touch 
 not been qualified. The local four-side picker accepts native keyboard and pointer
 controls; the richer compositor selector is still being developed.
 
-The browser package candidate requires the public SDK and patched Qt. It remains an
-explicit `.ebuild.in` template until the SDK-owning desktop minimum is provided and
+The future native package candidate requires the public SDK and patched Qt. It remains
+an explicit `.ebuild.in` template until the SDK-owning desktop minimum is provided and
 installed-package acceptance passes. No development library is copied into a release.
+
+At the owner's explicit binary-installation request, Portage built and installed
+`www-client/qindaweb-0.1.0_alpha1` on qinda, then the laptop installed that signed
+390 KiB binary with `--usepkgonly`. QtWayland 6.11.1-r2 was also installed from the
+signed binhost. Both hosts have `/usr/bin/qindaweb`, successful version/help checks
+and resolved runtime libraries; the application launcher/icon are package-owned.
+No laptop compilation or native GUI test, desktop restart or default-browser change.
+
+That preview disables placement SDK discovery and opens ordinary windows. Its same
+configuration with installed QindaTK r15 passed three routine CTest gates and four
+explicit real-Gecko UI/profile tests on qinda (no failures or skips). This checks
+browsing pixels/input, web popups, hidden controls, temporary address and menu actions;
+it does not establish delivered container placement. Logs are in remote `.cache/`
+`preview-qa-{ctest,ui}.log`. The strict native revision remains pending the desktop.

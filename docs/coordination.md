@@ -61,3 +61,16 @@ consumer passes. Its exact minimum revision is pending: the recipe is `.ebuild.i
 with that one placeholder, not a fallback delivery. No shared overlay main/delivery
 record, active desktop checkout or live session was modified. Office's published
 overlay master `109ddbf` and toolkit r13 were preserved as ancestors of our branch.
+
+The owner then explicitly requested laptop binary installation. The desktop board
+already permits an explicitly experimental fallback while native packaging is held.
+Overlay `b1114bd` adds that ordinary-window alpha1 recipe, pinning browser `3f44091`
+and disabling SDK discovery so no stage is linked/copied. Future strict native
+delivery is reserved as a new alpha1-r1 `.ebuild.in` revision (`03a0f96`), preserving
+the installed preview's immutable recipe. Current overlay master `28b470a`, Office
+updates and toolkit r15 were merged into our branch before editing.
+
+Portage built/signed alpha1 on qinda; the laptop installed alpha1 and QtWayland r2
+with binary-only commands. Preview QA on qinda passed routine3/3 and real-Gecko4/4
+with installed toolkit r15. Manager received the preview limitation, resource
+release and final delivery details. No laptop build/headful test or desktop rollout.

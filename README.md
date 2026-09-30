@@ -48,5 +48,11 @@ creates and marks its own Firefox profile; it refuses to overwrite existing prof
 
 Heavy builds and runtime tests run on qinda while the laptop is in use. See
 [acceptance](docs/acceptance.md) for verified behavior and remaining qualification.
-The native Portage recipe awaits the desktop owner's consolidated SDK package;
-development staging is never copied into an installed browser.
+`www-client/qindaweb-0.1.0_alpha1` is installed on qinda and the laptop through
+signed qinda-built Portage binaries, including QtWayland's keyboard fix. Launch
+**QindaWeb** from the application menu or run `qindaweb`.
+
+This installed preview opens ordinary windows. The native Portage revision awaits
+the desktop owner's consolidated SDK package; automatic container tabs and splits
+are not delivered by the preview. Development staging is never copied into an
+installed browser.
