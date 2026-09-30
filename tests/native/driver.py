@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Runs solely as the private compositor's exit-with-session child."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -22,7 +23,9 @@ def main():
     env = dict(os.environ, QINDAWEB_NATIVE_PLACEMENT="1", QT_QUICK_BACKEND="software")
     if os.environ.get("QINDAWEB_TRACE_WAYLAND"):
         env["WAYLAND_DEBUG"] = "server"
-    evidence = dict(mappedLibraries=mapped, snapshots=[])
+    evidence = dict(mappedLibraries=mapped,
+                    mappedLibrarySha256={name: hashlib.sha256(Path(name).read_bytes()).hexdigest() for name in mapped},
+                    snapshots=[])
     input_sent = False
     titles = {name: "Native QindaWeb " + name + " — QindaWeb" for name in ("source", "tab", "split", "grouped tab")}
     with (output / "probe.log").open("w") as log:

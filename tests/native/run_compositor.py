@@ -76,6 +76,7 @@ def main():
         raise RuntimeError("No browser scene evidence; inspect session.log")
     evidence = json.loads(evidence_file.read_text())
     evidence["desktopRevision"] = subprocess.check_output(["git", "-C", str(desktop), "rev-parse", "HEAD"], text=True).strip()
+    evidence["browserRevision"] = subprocess.check_output(["git", "-C", str(Path(__file__).resolve().parents[2]), "rev-parse", "HEAD"], text=True).strip()
     evidence["probeSha256"] = hashlib.sha256(args.probe.read_bytes()).hexdigest()
     evidence["scenario"] = spec.scenario_id
     tab = evidence.get("tabSnapshot", {}).get("windows", {})
