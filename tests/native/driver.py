@@ -18,7 +18,7 @@ def main():
     mapped = sorted({line.split()[-1] for line in Path(f"/proc/{os.getppid()}/maps").read_text().splitlines() if "qindaqt_compositor.so" in line})
     env = dict(os.environ, QINDAWEB_NATIVE_PLACEMENT="1", QT_QUICK_BACKEND="software")
     evidence = dict(mappedLibraries=mapped, snapshots=[])
-    titles = {name: "Native QindaWeb " + name + " — QindaWeb" for name in ("source", "tab", "split")}
+    titles = {name: "Native QindaWeb " + name + " — QindaWeb" for name in ("source", "tab", "split", "grouped tab")}
     with (output / "probe.log").open("w") as log:
         child = subprocess.Popen([os.environ["QINDAWEB_NATIVE_PROBE"], "nativeContainerPlacement", "-v1"], env=env, stdout=log, stderr=subprocess.STDOUT)
         try:
@@ -31,8 +31,10 @@ def main():
                 # surface-teardown snapshot cannot prove placement geometry.
                 if "QINDAWEB_NATIVE_TAB_READY" in trace and titles["split"] not in snapshot["windows"] and {titles["source"], titles["tab"]}.issubset(snapshot["windows"]):
                     evidence["tabSnapshot"] = snapshot
-                if "QINDAWEB_NATIVE_SPLIT_READY" in trace and set(titles.values()).issubset(snapshot["windows"]):
+                if "QINDAWEB_NATIVE_SPLIT_READY" in trace and titles["grouped tab"] not in snapshot["windows"] and {titles[name] for name in ("source", "tab", "split")}.issubset(snapshot["windows"]):
                     evidence["splitSnapshot"] = snapshot
+                if "QINDAWEB_NATIVE_GROUP_TAB_READY" in trace and set(titles.values()).issubset(snapshot["windows"]):
+                    evidence["groupedTabSnapshot"] = snapshot
                 time.sleep(0.05)
             if child.poll() is None:
                 child.terminate()

@@ -88,8 +88,12 @@ def main():
     left, right = members[1].get("geometry", {}), members[2].get("geometry", {})
     geometry = bool(left) and bool(right) and left["x"] + left["width"] <= right["x"] and abs(left["y"] - right["y"]) <= 1 and abs(left["height"] - right["height"]) <= 1
     visibility = members[0].get("minimized") is True and all(member.get("minimized") is False for member in members[1:])
-    passed = evidence.get("probeExit") == 0 and str(plugin.resolve()) in evidence["mappedLibraries"] and tab_ok and same_group and geometry and visibility
-    evidence["checks"] = dict(tabAcceptedInScene=tab_ok, sameContainer=same_group, splitFrames=geometry, activePageVisibility=visibility, passed=passed)
+    grouped_scene = evidence.get("groupedTabSnapshot", {})
+    grouped_members = [grouped_scene.get("windows", {}).get("Native QindaWeb " + name + " — QindaWeb", {}) for name in ("source", "tab", "split", "grouped tab")]
+    grouped_owners = {member.get("containerId") for member in grouped_members}
+    grouped_ok = len(grouped_owners) == 1 and grouped_owners == owners and bool(next(iter(owners))) and all(member.get("minimized") is True for member in grouped_members[:3]) and grouped_members[3].get("minimized") is False and grouped_scene.get("hybrid", {}).get("containerCount") == 1
+    passed = evidence.get("probeExit") == 0 and str(plugin.resolve()) in evidence["mappedLibraries"] and tab_ok and same_group and geometry and visibility and grouped_ok
+    evidence["checks"] = dict(tabAcceptedInScene=tab_ok, sameContainer=same_group, splitFrames=geometry, activePageVisibility=visibility, existingContainerTab=grouped_ok, passed=passed)
     evidence_file.write_text(json.dumps(evidence, indent=2) + "\n")
     print(json.dumps(dict(scenario=spec.scenario_id, **evidence["checks"], output=str(output)), sort_keys=True))
     return 0 if passed else 1

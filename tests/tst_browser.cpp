@@ -245,6 +245,22 @@ private slots:
         QTRY_COMPARE(split->title(), QStringLiteral("Native QindaWeb split"));
         qInfo().noquote() << "QINDAWEB_NATIVE_SPLIT_READY" << container;
         QTest::qWait(1000);
+        split->window()->requestActivate();
+        QTRY_VERIFY(split->window()->isActive());
+        QTest::keyClick(split->window(), Qt::Key_T, Qt::ControlModifier);
+        QTRY_COMPARE(browser.views().size(), 4);
+        QTRY_COMPARE_WITH_TIMEOUT(placement.size(), 3, 10000);
+        QVERIFY2(placement.at(2).at(1).toBool(), qPrintable(placement.at(2).at(3).toString()));
+        QCOMPARE(placement.at(2).at(2).toString(), container);
+        QindaWeb::BrowserView *grouped = nullptr;
+        for (auto *candidate : browser.views()) if (candidate != source && candidate != tab && candidate != split) grouped = candidate;
+        QVERIFY(grouped);
+        QCOMPARE(placement.at(2).at(0).toString(), grouped->id());
+        QTRY_VERIFY_WITH_TIMEOUT(grouped->ready() && !grouped->loading(), 20000);
+        QCOMPARE(evaluate(browser, grouped, QStringLiteral("document.title = 'Native QindaWeb grouped tab'; 'named'")), QStringLiteral("named"));
+        QTRY_COMPARE(grouped->title(), QStringLiteral("Native QindaWeb grouped tab"));
+        qInfo().noquote() << "QINDAWEB_NATIVE_GROUP_TAB_READY" << container;
+        QTest::qWait(1000);
     }
 };
 int main(int argc, char **argv) {
