@@ -20,6 +20,8 @@ def main():
     output = Path(os.environ["QINDAWEB_NATIVE_OUTPUT"])
     mapped = sorted({line.split()[-1] for line in Path(f"/proc/{os.getppid()}/maps").read_text().splitlines() if "qindaqt_compositor.so" in line})
     env = dict(os.environ, QINDAWEB_NATIVE_PLACEMENT="1", QT_QUICK_BACKEND="software")
+    if os.environ.get("QINDAWEB_TRACE_WAYLAND"):
+        env["WAYLAND_DEBUG"] = "server"
     evidence = dict(mappedLibraries=mapped, snapshots=[])
     input_sent = False
     titles = {name: "Native QindaWeb " + name + " — QindaWeb" for name in ("source", "tab", "split", "grouped tab")}
