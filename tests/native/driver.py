@@ -12,12 +12,16 @@ import time
 def main():
     desktop = Path(os.environ["QINDAWEB_DESKTOP_CHECKOUT"])
     sys.path.insert(0, str(desktop / "tests/session/shade_visibility"))
-    from shade_control import connect
+    from shade_control import connect, key
     control = connect()
+    # A virtual compositor has no hardware keyboard. Create its documented
+    # development input device before Qt connects and receives the seat/keymap.
+    control.inject([key("v", False)])
     output = Path(os.environ["QINDAWEB_NATIVE_OUTPUT"])
     mapped = sorted({line.split()[-1] for line in Path(f"/proc/{os.getppid()}/maps").read_text().splitlines() if "qindaqt_compositor.so" in line})
     env = dict(os.environ, QINDAWEB_NATIVE_PLACEMENT="1", QT_QUICK_BACKEND="software")
     evidence = dict(mappedLibraries=mapped, snapshots=[])
+    input_sent = False
     titles = {name: "Native QindaWeb " + name + " — QindaWeb" for name in ("source", "tab", "split", "grouped tab")}
     with (output / "probe.log").open("w") as log:
         child = subprocess.Popen([os.environ["QINDAWEB_NATIVE_PROBE"], "-v1"], env=env, stdout=log, stderr=subprocess.STDOUT)
@@ -27,6 +31,10 @@ def main():
                 snapshot = dict(hybrid=control.hybrid(), windows=control.windows())
                 evidence["snapshots"].append(snapshot)
                 trace = (output / "probe.log").read_text()
+                if "QINDAWEB_FIXTURE_INPUT_READY" in trace and not input_sent:
+                    control.inject([event for name in "cnv" for event in (key(name, True), key(name, False))])
+                    input_sent = True
+                    evidence["keyboardInput"] = "private compositor normal input chain, C/N/V"
                 # Preserve a live scene after each completion; the final
                 # surface-teardown snapshot cannot prove placement geometry.
                 if "QINDAWEB_NATIVE_TAB_READY" in trace and "QINDAWEB_NATIVE_SPLIT_PENDING" not in trace and {titles["source"], titles["tab"]}.issubset(snapshot["windows"]):

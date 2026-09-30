@@ -103,10 +103,14 @@ private slots:
         QTest::mouseClick(view->window(), Qt::LeftButton, {}, page->mapToScene(page->mapFromSurface(QPointF(70, 44))).toPoint());
         QTest::qWait(200);
         qInfo().noquote() << "Fixture pointer trace" << evaluate(browser, view, QStringLiteral("JSON.stringify(window.testEvents)"));
-        for (Qt::Key key : {Qt::Key_G, Qt::Key_E, Qt::Key_C, Qt::Key_K, Qt::Key_O})
+        const bool nativeInput = qEnvironmentVariableIsSet("QINDAWEB_NATIVE_PLACEMENT");
+        if (nativeInput) qInfo().noquote() << "QINDAWEB_FIXTURE_INPUT_READY";
+        else for (Qt::Key key : {Qt::Key_G, Qt::Key_E, Qt::Key_C, Qt::Key_K, Qt::Key_O})
             QTest::keyClick(view->window(), key);
-        QTest::qWait(250);
-        QCOMPARE(evaluate(browser, view, QStringLiteral("document.querySelector('#entry').value")), QStringLiteral("gecko"));
+        // The native runner uses the compositor's existing C/N/V allowlist
+        // through its normal keyboard chain, never host uinput or BiDi typing.
+        QTRY_COMPARE_WITH_TIMEOUT(evaluate(browser, view, QStringLiteral("document.querySelector('#entry').value")),
+            nativeInput ? QStringLiteral("cnv") : QStringLiteral("gecko"), 5000);
         QTest::keyClick(view->window(), Qt::Key_H, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_VERIFY(!view->chromeVisible());
         auto *content = view->window()->findChild<QQuickItem *>(QStringLiteral("browserContent"));
