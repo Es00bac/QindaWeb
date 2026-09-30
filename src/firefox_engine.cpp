@@ -154,6 +154,10 @@ void FirefoxEngine::reload(BrowserView *view)
 {
     viewCommand(view, QStringLiteral("browsingContext.reload"), {{QStringLiteral("wait"), QStringLiteral("none")}});
 }
+void FirefoxEngine::activate(BrowserView *view)
+{
+    viewCommand(view, QStringLiteral("browsingContext.activate"), {});
+}
 void FirefoxEngine::traverse(BrowserView *view, int delta)
 {
     viewCommand(view, QStringLiteral("browsingContext.traverseHistory"), {{QStringLiteral("delta"), delta}});

@@ -21,10 +21,10 @@ namespace MenuWire = QindaQt::Shell::GlobalMenu::DbusMenu;
 class KeyTrace : public QObject {
 public:
     QStringList events;
-    bool eventFilter(QObject *, QEvent *event) override {
+    bool eventFilter(QObject *watched, QEvent *event) override {
         if (event->type() == QEvent::KeyPress) {
             const auto *key = static_cast<QKeyEvent *>(event);
-            events.append(QStringLiteral("%1/%2/%3").arg(key->key()).arg(key->nativeScanCode()).arg(key->nativeVirtualKey()));
+            events.append(QStringLiteral("%1:%2/%3/%4").arg(watched->objectName()).arg(key->key()).arg(key->nativeScanCode()).arg(key->nativeVirtualKey()));
         }
         return false;
     }
@@ -118,6 +118,8 @@ private slots:
         const bool nativeInput = qEnvironmentVariableIsSet("QINDAWEB_NATIVE_PLACEMENT");
         KeyTrace keys;
         view->window()->installEventFilter(&keys);
+        page->installEventFilter(&keys);
+        qInfo().noquote() << "Fixture document focus" << evaluate(browser, view, QStringLiteral("JSON.stringify({focused:document.hasFocus(),active:document.activeElement.id})"));
         qInfo() << "Fixture keyboard focus" << view->window()->isActive() << page->hasActiveFocus()
                 << (page->surface()->compositor()->defaultSeat()->keyboardFocus() == page->surface());
         if (nativeInput) qInfo().noquote() << "QINDAWEB_FIXTURE_INPUT_READY";

@@ -27,6 +27,7 @@ public:
     void closeView(BrowserView *view);
     void navigate(BrowserView *view, const QUrl &url);
     void reload(BrowserView *view);
+    void activate(BrowserView *view);
     void traverse(BrowserView *view, int delta);
     void stop();
     QString identity() const { return m_identity; }

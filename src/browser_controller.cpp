@@ -158,8 +158,10 @@ void BrowserController::reload(BrowserView *view) { m_engine.reload(view); }
 void BrowserController::traverse(BrowserView *view, int delta) { m_engine.traverse(view, delta); }
 void BrowserController::activate(BrowserView *view)
 {
-    if (view && view->window() && view->window()->isActive() && view->shellSurface())
+    if (view && view->window() && view->window()->isActive() && view->shellSurface()) {
         m_host.defaultSeat()->setKeyboardFocus(view->shellSurface()->surface());
+        m_engine.activate(view);
+    }
 }
 void BrowserController::closeView(BrowserView *view)
 {
