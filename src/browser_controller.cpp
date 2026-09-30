@@ -91,13 +91,34 @@ BrowserView *BrowserController::newView(BrowserView *source, const QString &plac
 void BrowserController::submitPlacement(BrowserView *source, BrowserView *created, const QString &placement)
 {
     if (!source || !created || !source->window() || !created->window()) return;
-    QString error;
-    const quint32 id = m_placement.place(source->window(), created->window(), placement, &error);
-    if (id) m_placements.insert(id, created);
-    else {
-        created->setMessage(error);
-        emit placementFinished(created->id(), false, {}, error);
-    }
+    const auto dispatched = std::make_shared<bool>(false);
+    const auto dispatch = [this, source = QPointer<BrowserView>(source), created = QPointer<BrowserView>(created), placement, dispatched] {
+        if (*dispatched || !source || !created || !source->window() || !created->window()) return;
+        *dispatched = true;
+        QString error;
+        const quint32 id = m_placement.place(source->window(), created->window(), placement, &error);
+        if (id) m_placements.insert(id, created);
+        else {
+            created->setMessage(error);
+            emit placementFinished(created->id(), false, {}, error);
+        }
+    };
+    if (!m_placement.available()) { dispatch(); return; }
+    // AGENT-CONTRACT: commit the first native Qt frame before requesting
+    // placement. A newly assigned shell role can precede its normal mapped
+    // window state; neither a handle nor isVisible() proves that transition.
+    // AutoConnection queues threaded rendering signals onto our GUI thread.
+    const auto connection = connect(created->window(), &QQuickWindow::frameSwapped, this, dispatch, Qt::SingleShotConnection);
+    created->window()->requestUpdate();
+    QTimer::singleShot(5000, this, [this, guard = QPointer<BrowserView>(created), dispatched, connection] {
+        if (*dispatched) return;
+        *dispatched = true;
+        disconnect(connection);
+        if (!guard) return;
+        const QString error = QStringLiteral("The new window did not finish mapping; it remains separate.");
+        guard->setMessage(error);
+        emit placementFinished(guard->id(), false, {}, error);
+    });
 }
 void BrowserController::beginSplit(BrowserView *source)
 {

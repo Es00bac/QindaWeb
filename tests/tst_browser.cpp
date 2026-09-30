@@ -202,6 +202,7 @@ private slots:
         QVERIFY(source);
         QTRY_VERIFY_WITH_TIMEOUT(source->ready() && !source->loading(), 35000);
         QTRY_VERIFY(browser.placementAvailable());
+        QTRY_VERIFY(source->globalMenuAvailable());
         source->window()->setTitle(QStringLiteral("Native QindaWeb source"));
         source->window()->requestActivate();
         QTRY_VERIFY(source->window()->isActive());
@@ -210,6 +211,8 @@ private slots:
         QindaWeb::BrowserView *tab = nullptr;
         for (auto *candidate : browser.views()) if (candidate != source) tab = candidate;
         QVERIFY(tab);
+        qInfo() << "Native window roles/states" << source->window()->flags() << source->window()->windowStates()
+                << tab->window()->flags() << tab->window()->windowStates();
         QTRY_COMPARE_WITH_TIMEOUT(placement.size(), 1, 10000);
         QCOMPARE(placement.at(0).at(0).toString(), tab->id());
         QVERIFY2(placement.at(0).at(1).toBool(), qPrintable(placement.at(0).at(3).toString()));
