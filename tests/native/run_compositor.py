@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,7 @@ def main():
     desktop = args.desktop_checkout.resolve()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    (output / "evidence.json").unlink(missing_ok=True)
     sys.path.insert(0, str(desktop / "tests/session"))
     from nested_session_scenario import (
         isolated_environment, load_virtual_spec, running_private_session_bus,
@@ -56,12 +58,19 @@ def main():
             str(Path(__file__).with_name("driver.py")),
         ]
         with running_private_session_bus(root, Path(shutil.which("dbus-daemon")), env):
+            session = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
             try:
-                result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=100)
+                trace, _ = session.communicate(timeout=100)
             except subprocess.TimeoutExpired as error:
-                (output / "session.log").write_bytes((error.stdout or b"") + (error.stderr or b""))
+                os.killpg(session.pid, signal.SIGTERM)
+                try:
+                    trace, _ = session.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(session.pid, signal.SIGKILL)
+                    trace, _ = session.communicate(timeout=5)
+                (output / "session.log").write_text(trace)
                 raise RuntimeError("Private browser fixture exceeded its deadline") from error
-        (output / "session.log").write_text(result.stdout + result.stderr)
+        (output / "session.log").write_text(trace)
     evidence_file = output / "evidence.json"
     if not evidence_file.exists():
         raise RuntimeError("No browser scene evidence; inspect session.log")
@@ -71,9 +80,9 @@ def main():
     evidence["scenario"] = spec.scenario_id
     tab = evidence.get("tabSnapshot", {}).get("windows", {})
     split = evidence.get("splitSnapshot", {}).get("windows", {})
-    source, target = (tab.get("Native QindaWeb " + name, {}) for name in ("source", "tab"))
+    source, target = (tab.get("Native QindaWeb " + name + " — QindaWeb", {}) for name in ("source", "tab"))
     tab_ok = bool(source.get("containerId")) and source.get("containerId") == target.get("containerId") and source.get("minimized") is True and target.get("minimized") is False
-    members = [split.get("Native QindaWeb " + name, {}) for name in ("source", "tab", "split")]
+    members = [split.get("Native QindaWeb " + name + " — QindaWeb", {}) for name in ("source", "tab", "split")]
     owners = {member.get("containerId") for member in members}
     same_group = len(owners) == 1 and bool(next(iter(owners)))
     left, right = members[1].get("geometry", {}), members[2].get("geometry", {})

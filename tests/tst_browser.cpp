@@ -203,7 +203,8 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(source->ready() && !source->loading(), 35000);
         QTRY_VERIFY(browser.placementAvailable());
         QTRY_VERIFY(source->globalMenuAvailable());
-        source->window()->setTitle(QStringLiteral("Native QindaWeb source"));
+        QCOMPARE(evaluate(browser, source, QStringLiteral("document.title = 'Native QindaWeb source'; 'named'")), QStringLiteral("named"));
+        QTRY_COMPARE(source->title(), QStringLiteral("Native QindaWeb source"));
         source->window()->requestActivate();
         QTRY_VERIFY(source->window()->isActive());
         QTest::keyClick(source->window(), Qt::Key_T, Qt::ControlModifier);
@@ -219,7 +220,9 @@ private slots:
         const QString container = placement.at(0).at(2).toString();
         QVERIFY(!container.isEmpty());
         QTRY_VERIFY_WITH_TIMEOUT(tab->ready() && tab->shellSurface() && tab->shellSurface()->surface()->hasContent(), 20000);
-        tab->window()->setTitle(QStringLiteral("Native QindaWeb tab"));
+        QTRY_VERIFY(!tab->loading());
+        QCOMPARE(evaluate(browser, tab, QStringLiteral("document.title = 'Native QindaWeb tab'; 'named'")), QStringLiteral("named"));
+        QTRY_COMPARE(tab->title(), QStringLiteral("Native QindaWeb tab"));
         qInfo().noquote() << "QINDAWEB_NATIVE_TAB_READY" << container;
         QTest::qWait(1000); // Retain live windows while the driver captures scene evidence.
         tab->window()->requestActivate();
@@ -237,7 +240,9 @@ private slots:
         QVERIFY(split);
         QCOMPARE(placement.at(1).at(0).toString(), split->id());
         QTRY_VERIFY_WITH_TIMEOUT(split->ready() && split->shellSurface() && split->shellSurface()->surface()->hasContent(), 20000);
-        split->window()->setTitle(QStringLiteral("Native QindaWeb split"));
+        QTRY_VERIFY(!split->loading());
+        QCOMPARE(evaluate(browser, split, QStringLiteral("document.title = 'Native QindaWeb split'; 'named'")), QStringLiteral("named"));
+        QTRY_COMPARE(split->title(), QStringLiteral("Native QindaWeb split"));
         qInfo().noquote() << "QINDAWEB_NATIVE_SPLIT_READY" << container;
         QTest::qWait(1000);
     }
