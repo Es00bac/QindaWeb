@@ -227,6 +227,7 @@ private slots:
         QTest::qWait(1000); // Retain live windows while the driver captures scene evidence.
         tab->window()->requestActivate();
         QTRY_VERIFY(tab->window()->isActive());
+        qInfo().noquote() << "QINDAWEB_NATIVE_SPLIT_PENDING";
         QTest::keyClick(tab->window(), Qt::Key_Return, Qt::ControlModifier | Qt::ShiftModifier);
         QTRY_COMPARE(browser.views().size(), 3);
         auto *chooser = tab->window()->findChild<QObject *>(QStringLiteral("browserPlacementChooser"));
@@ -255,6 +256,7 @@ private slots:
         const auto menu = menuCall(split, QStringLiteral("GetLayout"), {0, -1, QStringList{}});
         QVERIFY2(menu.type() == QDBusMessage::ReplyMessage, qPrintable(menu.errorMessage()));
         QDBusConnection::disconnectFromBus(QStringLiteral("qindaweb-menu-test"));
+        qInfo().noquote() << "QINDAWEB_NATIVE_GROUP_TAB_PENDING";
         QTest::keyClick(split->window(), Qt::Key_T, Qt::ControlModifier);
         QTRY_COMPARE(browser.views().size(), 4);
         QTRY_COMPARE_WITH_TIMEOUT(placement.size(), 3, 10000);

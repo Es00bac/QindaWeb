@@ -29,9 +29,9 @@ def main():
                 trace = (output / "probe.log").read_text()
                 # Preserve a live scene after each completion; the final
                 # surface-teardown snapshot cannot prove placement geometry.
-                if "QINDAWEB_NATIVE_TAB_READY" in trace and titles["split"] not in snapshot["windows"] and {titles["source"], titles["tab"]}.issubset(snapshot["windows"]):
+                if "QINDAWEB_NATIVE_TAB_READY" in trace and "QINDAWEB_NATIVE_SPLIT_PENDING" not in trace and {titles["source"], titles["tab"]}.issubset(snapshot["windows"]):
                     evidence["tabSnapshot"] = snapshot
-                if "QINDAWEB_NATIVE_SPLIT_READY" in trace and titles["grouped tab"] not in snapshot["windows"] and {titles[name] for name in ("source", "tab", "split")}.issubset(snapshot["windows"]):
+                if "QINDAWEB_NATIVE_SPLIT_READY" in trace and "QINDAWEB_NATIVE_GROUP_TAB_PENDING" not in trace and {titles[name] for name in ("source", "tab", "split")}.issubset(snapshot["windows"]):
                     evidence["splitSnapshot"] = snapshot
                 if "QINDAWEB_NATIVE_GROUP_TAB_READY" in trace and set(titles.values()).issubset(snapshot["windows"]):
                     evidence["groupedTabSnapshot"] = snapshot
