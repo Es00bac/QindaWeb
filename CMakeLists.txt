@@ -64,6 +64,14 @@ install(FILES data/org.qindaqt.QindaWeb.desktop DESTINATION ${CMAKE_INSTALL_DATA
 install(FILES data/qindaweb.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(QINDAWEB_WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
+    pkg_check_modules(QINDAWEB_WAYLAND_SERVER REQUIRED IMPORTED_TARGET wayland-server)
+    qt_add_executable(tst_keyboard tests/tst_keyboard.cpp)
+    target_link_libraries(tst_keyboard PRIVATE Qt6::Test Qt6::Gui Qt6::WaylandCompositor
+        PkgConfig::QINDAWEB_WAYLAND_CLIENT PkgConfig::QINDAWEB_WAYLAND_SERVER)
+    add_test(NAME keyboard-resources COMMAND tst_keyboard)
+    set_tests_properties(keyboard-resources PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     qt_add_executable(tst_navigation tests/tst_navigation.cpp src/navigation.cpp)
     target_include_directories(tst_navigation PRIVATE src)
     target_link_libraries(tst_navigation PRIVATE Qt6::Test)
@@ -76,7 +84,7 @@ if(BUILD_TESTING)
         add_test(NAME launch-ipc COMMAND ${QINDAWEB_DBUS_RUN_SESSION} -- $<TARGET_FILE:tst_instance>)
     endif()
     qt_add_executable(tst_browser tests/tst_browser.cpp)
-    target_link_libraries(tst_browser PRIVATE qindaweb_core Qt6::Test)
+    target_link_libraries(tst_browser PRIVATE qindaweb_core Qt6::Test PkgConfig::QINDAWEB_WAYLAND_SERVER)
     target_compile_definitions(tst_browser PRIVATE QINDAWEB_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixture.html")
     # Explicit native acceptance executable: never silently run headful Firefox
     # in routine CTest or against the user's ordinary browser profile.

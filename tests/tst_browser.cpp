@@ -8,7 +8,9 @@
 #include <QQuickWindow>
 #include <QWaylandQuickShellSurfaceItem>
 #include <QWaylandSurface>
+#include <QWaylandClient>
 #include <QWaylandSeat>
+#include <wayland-server-core.h>
 #include <QTemporaryDir>
 #include <QDir>
 #include <QDBusConnection>
@@ -122,6 +124,14 @@ private slots:
         qInfo().noquote() << "Fixture document focus" << evaluate(browser, view, QStringLiteral("JSON.stringify({focused:document.hasFocus(),active:document.activeElement.id})"));
         qInfo() << "Fixture keyboard focus" << view->window()->isActive() << page->hasActiveFocus()
                 << (page->surface()->compositor()->defaultSeat()->keyboardFocus() == page->surface());
+        QStringList keyboardBindings;
+        wl_client_for_each_resource(page->surface()->client()->client(), [](wl_resource *resource, void *data) {
+            if (QByteArray(wl_resource_get_class(resource)) == QByteArrayLiteral("wl_keyboard"))
+                static_cast<QStringList *>(data)->append(QString::number(wl_resource_get_id(resource)));
+            return WL_ITERATOR_CONTINUE;
+        }, &keyboardBindings);
+        qInfo() << "Gecko keyboard bindings on this surface's single wl_client" << keyboardBindings;
+        QVERIFY2(keyboardBindings.size() >= 2, "The GTK/Mozilla multiple-keyboard regression was not exercised");
         if (nativeInput) qInfo().noquote() << "QINDAWEB_FIXTURE_INPUT_READY";
         else for (Qt::Key key : {Qt::Key_G, Qt::Key_E, Qt::Key_C, Qt::Key_K, Qt::Key_O})
             QTest::keyClick(view->window(), key);
@@ -185,8 +195,9 @@ private slots:
         for (auto *candidate : browser.views()) if (candidate != view) popup = candidate;
         QVERIFY(popup);
         QTRY_VERIFY_WITH_TIMEOUT(popup->ready(), 20000);
-        QCOMPARE(evaluate(browser, popup, QStringLiteral("document.title")), QStringLiteral("QindaWeb Gecko acceptance"));
-        QCOMPARE(evaluate(browser, popup, QStringLiteral("location.search")), QStringLiteral("?popup=1"));
+        // A paired Wayland window can precede its popup's document navigation.
+        QTRY_COMPARE_WITH_TIMEOUT(evaluate(browser, popup, QStringLiteral("document.title")), QStringLiteral("QindaWeb Gecko acceptance"), 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(evaluate(browser, popup, QStringLiteral("location.search")), QStringLiteral("?popup=1"), 20000);
         (void)evaluate(browser, popup, QStringLiteral("window.close(); 'closed'"));
         QTRY_COMPARE_WITH_TIMEOUT(browser.views().size(), 1, 10000);
         view->window()->requestActivate();
